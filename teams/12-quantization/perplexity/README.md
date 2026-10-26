@@ -45,6 +45,20 @@ Quantize time per format on 4 CPUs: Q8_0 78 s, Q6_K 192 s, Q5_K_M 301 s, Q4_K_M 
 4. [`04-smoke-test.png`](screenshots/04-smoke-test.png): bf16, Q8_0, Q4_K_M and Q2_K each complete a prompt
 5. [`05-perplexity.png`](screenshots/05-perplexity.png): perplexity for all 7 files
 
+## Files
+
+- [`run_perplexity.py`](run_perplexity.py): runs perplexity on every GGUF in a folder and appends to `runs_ppl.csv`.
+  Works on the GGUFs from `scripts/quantize_eval.py` or `quantize/quantize_olmoe.sh`:
+  ```bash
+  pip install gguf
+  python teams/12-quantization/perplexity/run_perplexity.py --models-dir <folder with *.gguf> --llama-bin <llama.cpp bin folder>
+  ```
+  `--chunks N` gives a quick run on part of the text. Tested on a Mac M1 with two small GGUFs
+  (`ggml-org/models` `tinyllamas/stories15M` q8_0 and q4_0).
+- [`kaggle_run.ipynb`](kaggle_run.ipynb): the Kaggle notebook of this run, with all outputs. The cell that set
+  `$MODELS` is missing from it, so the quantize cell wrote the GGUFs to `/`; cell 12 moves them to `/kaggle/tmp/models`.
+- [`runs_ppl.csv`](runs_ppl.csv): the results above.
+
 ## Reproduce on Kaggle
 
 Notebook settings: GPU T4 x2, Internet on. Keep models outside `/kaggle/working` (20 GB limit).
@@ -64,7 +78,7 @@ for q in Q8_0 Q6_K Q5_K_M Q4_K_M Q3_K_M Q2_K; do
 done
 
 (cd llama.cpp && sh scripts/get-wikitext-2.sh)
-for q in bf16 Q8_0 Q6_K Q5_K_M Q4_K_M Q3_K_M Q2_K; do
+for q in bf16 Q8_0 Q6_K Q5_K_M Q4_K_M Q3_K_M Q2_K; do   # or: python run_perplexity.py --models-dir $M --llama-bin llama.cpp/build/bin
   llama.cpp/build/bin/llama-perplexity -m $M/olmoe-$q.gguf -f llama.cpp/wikitext-2-raw/wiki.test.raw -ngl 99 2>&1 | grep "Final estimate"
 done
 ```
