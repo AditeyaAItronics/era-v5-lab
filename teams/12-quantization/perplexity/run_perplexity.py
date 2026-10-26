@@ -81,7 +81,9 @@ def main():
     if not models:
         sys.exit(f"no .gguf files in {a.models_dir}")
     text = wikitext(a.models_dir)
-    metric = "ppl_wikitext2_test" + (f"_{a.chunks}chunks" if a.chunks else "")
+    # Context length and chunk count change the result, so non-default values go into the metric name.
+    metric = ("ppl_wikitext2_test" + (f"_ctx{a.ctx}" if a.ctx != 512 else "")
+              + (f"_{a.chunks}chunks" if a.chunks else ""))
     machine, tool = a.machine or machine_name(), llama_version(binary)
 
     for path in models:
