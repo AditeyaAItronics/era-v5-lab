@@ -49,8 +49,8 @@ jobs:
               }
               if (p[0] === "teams") {
                 if (!TEAMS.includes(p[1])) return `\`${path}\`: \`teams/${p[1]}\` is not a team folder. Use one of the 12 existing folders.`;
-                if (p.length === 3 && p[2] === "README.md") return null;
-                if (p.length < 4) return `\`${path}\`: put files in a topic folder, for example teams/${p[1]}/<topic>/<file>.`;
+                if (p.length === 3 && p[2].toLowerCase().endsWith(".md")) return null;
+                if (p.length < 4) return `\`${path}\`: put code and data files in a topic folder, for example teams/${p[1]}/<topic>/<file>. Only .md documents may sit directly in the team folder.`;
                 return null;
               }
               if (staff.includes(author)) return null;
