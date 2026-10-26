@@ -14,6 +14,21 @@ Run on 25 Oct 2026 by Rahul Bhati. Results: [`runs_ppl.csv`](runs_ppl.csv). Lowe
 - Eval: `llama-perplexity` on the full WikiText-2 test set (`scripts/get-wikitext-2.sh` in llama.cpp), n_ctx 512, `-ngl 99`
 - Quantization: `llama-quantize --output-tensor-type q8_0`; the router (`ffn_gate_inp`) is left F32 by llama-quantize
 
+## How perplexity is calculated
+
+What `llama-perplexity` does (`tools/perplexity/perplexity.cpp` in llama.cpp v0.7.0):
+
+1. The test text is tokenized and cut into chunks of 512 tokens (`n_ctx`). Each chunk is run on its own, starting from
+   an empty context, 4 chunks per batch (`n_seq=4`).
+2. Only the second half of each chunk is scored (`const int first = n_ctx/2;`), so every scored token has at least 256
+   tokens of context before it.
+3. For each scored token, NLL = -ln p(correct next token). PPL = exp(mean NLL over all scored tokens).
+   For example, Q4_K_M has mean NLL ln(8.1785) = 2.1015 against 2.0785 for bf16: 0.023 nats more per token.
+4. The ± is the standard error: the standard deviation of the per-token NLL divided by √(number of tokens), times PPL.
+
+Every format is scored on the same text with the same chunks, so the values compare directly. A different `n_ctx`
+gives different values, which is why `run_perplexity.py` adds `_ctxN` to the metric name when it is not 512.
+
 ## Results
 
 | Format | Bits/weight | Size | PPL | vs bf16 | Eval time |
