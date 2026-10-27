@@ -59,7 +59,7 @@ status = "active"
 tags = ["english"]
 licence = "test only"
 source = "local"
-files = [{{ path = "{data}" }}]
+files = [{{ path = "{data.as_posix()}" }}]
 id = "{{qid}}"
 dedupe = true
 texts = ["{{question}}", "{{answer|no_calc}}", "{{question}}\\n{{choices|lettered}}"]
