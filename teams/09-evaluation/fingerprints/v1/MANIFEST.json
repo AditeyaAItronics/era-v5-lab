@@ -1,11 +1,58 @@
 {
   "version": "v1",
-  "set_sha256": "0ccc1b0dc68cf9e772d00001320d305c84bf463edbf029625d6182fd8c5712a8",
+  "set_sha256": "11e290a44d1467875fdf8bebc55eab21f0a6367f411aab98a4a027a546fd372e",
   "normalize_id": "g9-v1",
   "normalize": "words = runs of Unicode L/M/N characters; each word NFKC then lower(); everything else separates words",
   "hash": "blake2b, digest_size=8, hex, of the n words joined by one space (UTF-8)",
   "line_format": "<item_ref>\\t<hash> <hash> ...",
   "benchmarks": {
+    "aime_2024": {
+      "name": "AIME 2024",
+      "tags": [
+        "english",
+        "math"
+      ],
+      "n": {
+        "prose": 13,
+        "code": 20
+      },
+      "items": 30,
+      "items_without_ngram": 0,
+      "item_grams": 24747,
+      "short_texts": 0,
+      "canaries": 0
+    },
+    "aime_2025": {
+      "name": "AIME 2025",
+      "tags": [
+        "english",
+        "math"
+      ],
+      "n": {
+        "prose": 13,
+        "code": 20
+      },
+      "items": 30,
+      "items_without_ngram": 0,
+      "item_grams": 1742,
+      "short_texts": 0,
+      "canaries": 0
+    },
+    "codeforces": {
+      "name": "Codeforces",
+      "tags": [
+        "code"
+      ],
+      "n": {
+        "prose": 13,
+        "code": 20
+      },
+      "items": 468,
+      "items_without_ngram": 0,
+      "item_grams": 263466,
+      "short_texts": 3,
+      "canaries": 0
+    },
     "flores200": {
       "name": "FLORES-200 (FLORES+)",
       "tags": [
@@ -121,6 +168,21 @@
       "short_texts": 3103,
       "canaries": 0
     },
+    "livecodebench": {
+      "name": "LiveCodeBench",
+      "tags": [
+        "code"
+      ],
+      "n": {
+        "prose": 13,
+        "code": 20
+      },
+      "items": 1055,
+      "items_without_ngram": 0,
+      "item_grams": 273462,
+      "short_texts": 0,
+      "canaries": 0
+    },
     "longbench_v2": {
       "name": "LongBench v2",
       "tags": [
@@ -220,10 +282,6 @@
     }
   },
   "not_covered": {
-    "aime": {
-      "status": "planned",
-      "reason": "30 + 30 problems in two Hugging Face repos. The registry takes one repo per benchmark, so it needs an entry for each year, with pinned revisions and sha256."
-    },
     "frontiermath": {
       "status": "skip",
       "reason": "The problems are private (Epoch AI). Only 12 are public. Use source = 'local' if TSAI gets them."
@@ -256,17 +314,9 @@
       "status": "planned",
       "reason": "Tasks are JSON files in a GitHub repo. Needs a reader for the task files."
     },
-    "livecodebench": {
-      "status": "planned",
-      "reason": "JSONL files on Hugging Face (release_v6, 1,055 problems). Needs a pinned revision and sha256, and templates for the problem text."
-    },
     "aider_polyglot": {
       "status": "planned",
       "reason": "225 exercises in 6 languages, as folders in a GitHub repo. Needs a reader for the instructions and solutions."
-    },
-    "codeforces": {
-      "status": "planned",
-      "reason": "On Hugging Face (test split, 468 problems). Needs a pinned revision and sha256, and templates for the problem text."
     },
     "indicgenbench": {
       "status": "planned",

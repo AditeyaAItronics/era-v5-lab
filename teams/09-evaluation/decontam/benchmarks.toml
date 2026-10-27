@@ -85,13 +85,34 @@ id = "{id}"
 texts = ["{question}", "{rationale}", "{question}\n{answer}"]
 canaries = ["{canary|guid}"]
 
-[aime]
-name = "AIME 2024 / 2025"
-status = "planned"
+# AIME 2024 / 2025 is one row of benchmarks_v1.md. The two repos have different fields, so one table each.
+[aime_2024]
+name = "AIME 2024"
+status = "active"
 tags = ["english", "math"]
-licence = "opencompass/AIME2025: MIT; HuggingFaceH4/aime_2024: none stated; the problems are (c) MAA"
-repo = "HuggingFaceH4/aime_2024 + opencompass/AIME2025"
-reason = "30 + 30 problems in two Hugging Face repos. The registry takes one repo per benchmark, so it needs an entry for each year, with pinned revisions and sha256."
+licence = "None stated on the card; the problems are (c) MAA"
+note = "Internal only (benchmarks_v1.md). Hashes only: no item is published."
+source = "hf"
+repo = "HuggingFaceH4/aime_2024"
+revision = "2fe88a2f1091d5048c0f36abc874fb997b3dd99a"
+files = [{ path = "data/train-00000-of-00001.parquet", sha256 = "26139847601a5037c237d5928b195e7260ca8074cf4f264b794af42847f79ccf" }]
+split = "test"
+id = "{id}"
+texts = ["{problem}", "{solution}", "{problem}\n{answer}"]
+
+[aime_2025]
+name = "AIME 2025"
+status = "active"
+tags = ["english", "math"]
+licence = "MIT (card); the problems are (c) MAA"
+note = "Internal only (benchmarks_v1.md). Hashes only: no item is published. Rows 0-14 are AIME I, 15-29 AIME II."
+source = "hf"
+repo = "opencompass/AIME2025"
+revision = "a6ad95f611d72cf628a80b58bd0432ef6638f958"
+files = [{ path = "aime2025-I.jsonl", sha256 = "b91b3c96f05d9635d2a0692b124ebe023c1ff59cb19c074275e6c4b349d0659e" },
+         { path = "aime2025-II.jsonl", sha256 = "16a2dcfbbf9db1b11f8a69a3ba5e4cac73e3641b19a37e2307e9c12240bbed5e" }]
+split = "test"
+texts = ["{question}", "{question}\n{answer}"]
 
 [frontiermath]
 name = "FrontierMath"
@@ -229,11 +250,24 @@ reason = "Tasks are JSON files in a GitHub repo. Needs a reader for the task fil
 
 [livecodebench]
 name = "LiveCodeBench"
-status = "planned"
+status = "active"
 tags = ["code"]
 licence = "Unclear: code MIT, dataset card \"cc\""
+note = "Internal only (benchmarks_v1.md). Hashes only: no item is published. release_v6 = the six files (1,055 problems)."
+source = "hf"
 repo = "livecodebench/code_generation_lite"
-reason = "JSONL files on Hugging Face (release_v6, 1,055 problems). Needs a pinned revision and sha256, and templates for the problem text."
+revision = "0fe84c3912ea0c4d4a78037083943e8f0c4dd505"
+files = [{ path = "test.jsonl", sha256 = "2bd02b38beb48e8c46b5b9987095d999ff38cd8efc255ea5d58974317c48f63f" },
+         { path = "test2.jsonl", sha256 = "095df7c5daf15f882c51a9deb84085cff1e073495a5dbcf95015a564d485f3a3" },
+         { path = "test3.jsonl", sha256 = "28ed26cc83363ce3f1fe2d5fad9f8393077beb1907b167a31bd3b32f80801b79" },
+         { path = "test4.jsonl", sha256 = "d711138ddaebfcf5f8ec6a4283ee677298c0f5c5d374a235af92aaf0584510da" },
+         { path = "test5.jsonl", sha256 = "7f77571c2a6df0c2a72a3277650309f67e01e0008e18117e624633df53f81214" },
+         { path = "test6.jsonl", sha256 = "bb4c364f71921c4495a6ad15abe1a927350b720009f4933e2e71f8af0f6fd1f5" }]
+split = "release_v6"
+id = "{question_id}"
+# The problem statement only. The test cases are numbers, and the starter code is a short
+# function signature that many other problems share.
+texts = ["{question_content}"]
 
 [aider_polyglot]
 name = "Aider Polyglot"
@@ -245,11 +279,20 @@ reason = "225 exercises in 6 languages, as folders in a GitHub repo. Needs a rea
 
 [codeforces]
 name = "Codeforces"
-status = "planned"
+status = "active"
 tags = ["code"]
 licence = "CC-BY-4.0 and ODC-By-4.0 (open-r1 packaging; the problems come from Codeforces)"
+note = "Internal only (benchmarks_v1.md). Hashes only: no item is published."
+source = "hf"
 repo = "open-r1/codeforces"
-reason = "On Hugging Face (test split, 468 problems). Needs a pinned revision and sha256, and templates for the problem text."
+revision = "fbe3f6e903ee854eec2e69e9d96d0306cde59baf"
+files = [{ path = "data/test-00000-of-00001.parquet", sha256 = "f3e241f6a111822aed1ee6800d3d3f73917ea4d10e70e264b47a7bcdba4cbf31" }]
+split = "test"
+id = "{id}"
+# The statement, the input and output sections, the notes and the editorial (the solution
+# explanation, which can contain code). The examples are numbers only.
+texts = ["{title}\n{description}", "{input_format}\n{output_format}", "{interaction_format}", "{note}"]
+mixed = ["{editorial}"]
 
 # ---------------------------------------------------------------- Indic
 

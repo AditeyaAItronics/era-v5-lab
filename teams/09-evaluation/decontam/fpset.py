@@ -131,7 +131,7 @@ def write_benchmark(set_dir, bid, items, n, meta=None, gram_filters=DEFAULT_GRAM
         if buf:
             names = shards.setdefault(length, [])
             fname = f"n{length}-{len(names):03d}.tsv"
-            (out / fname).write_text("".join(buf), encoding="utf-8")
+            (out / fname).write_text("".join(buf), encoding="utf-8", newline="\n")
             names.append(fname)
 
     for ref, by_len in all_items:
@@ -157,14 +157,14 @@ def write_benchmark(set_dir, bid, items, n, meta=None, gram_filters=DEFAULT_GRAM
     for length in list(lines):
         flush(length)
     if canaries:
-        (out / "canaries.txt").write_text("".join(c + "\n" for c in sorted(canaries)), encoding="utf-8")
+        (out / "canaries.txt").write_text("".join(c + "\n" for c in sorted(canaries)), encoding="utf-8", newline="\n")
     manifest = {**(meta or {}), "id": bid, "n": n, "gram_filters": list(gram_filters),
                 "boilerplate": boilerplate.files if boilerplate else {},
                 "short_min": short_min, "short_texts": n_short, "short_templates_dropped": len(templates),
                 "items": n_items, "items_without_ngram": n_empty, "item_grams": n_grams,
                 "canaries": len(canaries or ()),
                 "shards": {str(k): v for k, v in sorted(shards.items())}}
-    (out / "MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    (out / "MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
     return manifest
 
 
@@ -172,19 +172,32 @@ def _files(bm):
     return [f for names in bm["shards"].values() for f in names] + (["canaries.txt"] if bm.get("canaries") else [])
 
 
+# The top MANIFEST.json is not in SHA256SUMS (it holds set_sha256). Its parts are checked another way:
+# the summary of each benchmark against the benchmark's own MANIFEST.json, and not_covered against
+# not_covered.json, which is in SHA256SUMS.
+SUMMARY_KEYS = ("name", "tags", "n", "items", "items_without_ngram", "item_grams", "short_texts", "canaries")
+NOT_COVERED_FILE = "not_covered.json"
+
+
+def _summary(bm):
+    return {k: bm[k] for k in SUMMARY_KEYS if k in bm}
+
+
 def write_index(set_dir, not_covered=None):
-    """Write the top MANIFEST.json and SHA256SUMS from the benchmark folders. Returns set_sha256."""
+    """Write the top MANIFEST.json, not_covered.json and SHA256SUMS. Returns set_sha256."""
     d = Path(set_dir)
     benches, sums = {}, []
     for m in sorted(d.glob("*/MANIFEST.json")):
         bm = json.loads(m.read_text(encoding="utf-8"))
-        benches[bm["id"]] = {k: bm[k] for k in ("name", "tags", "n", "items", "items_without_ngram",
-                                                "item_grams", "short_texts", "canaries") if k in bm}
+        benches[bm["id"]] = _summary(bm)
         for fname in [m.name] + _files(bm):
             rel = f"{m.parent.name}/{fname}"
             sums.append(f"{hashlib.sha256((d / rel).read_bytes()).hexdigest()}  {rel}\n")
+    nc = d / NOT_COVERED_FILE
+    nc.write_text(json.dumps(not_covered or {}, indent=2) + "\n", encoding="utf-8", newline="\n")
+    sums.append(f"{hashlib.sha256(nc.read_bytes()).hexdigest()}  {NOT_COVERED_FILE}\n")
     sums_text = "".join(sums)
-    (d / "SHA256SUMS").write_text(sums_text, encoding="utf-8")
+    (d / "SHA256SUMS").write_text(sums_text, encoding="utf-8", newline="\n")
     set_id = hashlib.sha256(sums_text.encode("utf-8")).hexdigest()
     manifest = {
         "version": VERSION,
@@ -196,7 +209,7 @@ def write_index(set_dir, not_covered=None):
         "benchmarks": benches,
         "not_covered": not_covered or {},
     }
-    (d / "MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    (d / "MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
     return set_id
 
 
@@ -220,9 +233,19 @@ class Fingerprints:
                 want, rel = line.split("  ", 1)
                 if hashlib.sha256((d / rel).read_bytes()).hexdigest() != want:
                     raise ValueError(f"{rel}: sha256 does not match SHA256SUMS")
-            folders = {line.split("  ", 1)[1].split("/")[0] for line in sums.splitlines()}
+            rels = [line.split("  ", 1)[1] for line in sums.splitlines()]
+            folders = {rel.split("/")[0] for rel in rels if "/" in rel}
             if folders != set(self.manifest["benchmarks"]):
                 raise ValueError("the benchmarks in MANIFEST.json do not match SHA256SUMS")
+            for bid, summary in self.manifest["benchmarks"].items():
+                bm = json.loads((d / bid / "MANIFEST.json").read_text(encoding="utf-8"))
+                if summary != _summary(bm):
+                    raise ValueError(f"{bid}: MANIFEST.json does not match {bid}/MANIFEST.json")
+            if NOT_COVERED_FILE not in rels:
+                raise ValueError(f"{NOT_COVERED_FILE} is not in SHA256SUMS")
+            nc = json.loads((d / NOT_COVERED_FILE).read_text(encoding="utf-8"))
+            if nc != self.manifest.get("not_covered", {}):
+                raise ValueError(f"not_covered in MANIFEST.json does not match {NOT_COVERED_FILE}")
         self.set_sha256 = self.manifest["set_sha256"]
         all_b = self.manifest["benchmarks"]
         chosen = list(benchmarks or all_b)

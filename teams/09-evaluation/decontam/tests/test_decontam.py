@@ -10,6 +10,7 @@ then only rows with verdict "clean" are used).
 import csv
 import json
 import os
+import pathlib
 import random
 
 import pytest
@@ -156,6 +157,17 @@ def test_build_is_deterministic(toy, tmp_path):
     assert build_toy(tmp_path)[1] == set_id
 
 
+def test_windows_build_gives_the_same_set(toy, tmp_path, monkeypatch):
+    # On Windows, a text write without newline= writes "\r\n". The set must not change.
+    write_text = pathlib.Path.write_text
+
+    def windows_write_text(self, data, encoding=None, errors=None, newline=None):
+        return write_text(self, data, encoding=encoding, errors=errors, newline="\r\n" if newline is None else newline)
+
+    monkeypatch.setattr(pathlib.Path, "write_text", windows_write_text)
+    assert build_toy(tmp_path)[1] == toy[1]
+
+
 def test_short_item_is_counted_not_hidden(toy):
     out, _, fp = toy
     m = json.loads((out / "toy" / "MANIFEST.json").read_text())
@@ -201,32 +213,57 @@ def test_mixed_text_is_split_into_prose_and_code():
     assert texts["prose"] == [prose] and sorted(texts["code"]) == sorted([code, "return 1"])
 
 
-def test_tampered_shard_is_rejected(toy, tmp_path):
-    out, _, _ = toy
-    for f in out.rglob("*"):
+def copy_set(src, dest):
+    for f in src.rglob("*"):
         if f.is_file():
-            dest = tmp_path / f.relative_to(out)
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(f.read_bytes())
+            to = dest / f.relative_to(src)
+            to.parent.mkdir(parents=True, exist_ok=True)
+            to.write_bytes(f.read_bytes())
+
+
+def edit_top_manifest(set_dir, change):
+    top = set_dir / "MANIFEST.json"
+    manifest = json.loads(top.read_text(encoding="utf-8"))
+    change(manifest)
+    top.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+
+def test_tampered_shard_is_rejected(toy, tmp_path):
+    copy_set(toy[0], tmp_path)
     shard = tmp_path / "toy" / "n13-000.tsv"
     shard.write_text(shard.read_text() + "toy:test:q9\t0000000000000000\n")
     with pytest.raises(ValueError):
         Fingerprints(tmp_path)
 
 
+# The top MANIFEST.json is not in SHA256SUMS, so each of its parts must be checked another way.
+
 def test_manifest_without_a_benchmark_is_rejected(toy, tmp_path):
-    # The top MANIFEST.json is not in SHA256SUMS, so a removed entry must be caught another way.
-    out, _, _ = toy
-    for f in out.rglob("*"):
-        if f.is_file():
-            dest = tmp_path / f.relative_to(out)
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(f.read_bytes())
-    top = tmp_path / "MANIFEST.json"
-    manifest = json.loads(top.read_text(encoding="utf-8"))
-    del manifest["benchmarks"]["toy"]
-    top.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    with pytest.raises(ValueError):
+    copy_set(toy[0], tmp_path)
+    edit_top_manifest(tmp_path, lambda m: m["benchmarks"].pop("toy"))
+    with pytest.raises(ValueError, match="do not match SHA256SUMS"):
+        Fingerprints(tmp_path)
+
+
+def test_manifest_with_changed_tags_is_rejected(toy, tmp_path):
+    # Changed tags make --tags load other benchmarks.
+    copy_set(toy[0], tmp_path)
+    edit_top_manifest(tmp_path, lambda m: m["benchmarks"]["toy"].__setitem__("tags", ["code"]))
+    with pytest.raises(ValueError, match="toy/MANIFEST.json"):
+        Fingerprints(tmp_path)
+
+
+def test_manifest_with_changed_not_covered_is_rejected(toy, tmp_path):
+    copy_set(toy[0], tmp_path)
+    edit_top_manifest(tmp_path, lambda m: m["not_covered"].pop("later"))
+    with pytest.raises(ValueError, match="not_covered"):
+        Fingerprints(tmp_path)
+
+
+def test_changed_not_covered_file_is_rejected(toy, tmp_path):
+    copy_set(toy[0], tmp_path)
+    (tmp_path / "not_covered.json").write_text("{}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="not_covered.json"):
         Fingerprints(tmp_path)
 
 
