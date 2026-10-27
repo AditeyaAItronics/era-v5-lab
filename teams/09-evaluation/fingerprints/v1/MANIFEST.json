@@ -220,6 +220,10 @@
     }
   },
   "not_covered": {
+    "aime": {
+      "status": "planned",
+      "reason": "30 + 30 problems in two Hugging Face repos. The registry takes one repo per benchmark, so it needs an entry for each year, with pinned revisions and sha256."
+    },
     "frontiermath": {
       "status": "skip",
       "reason": "The problems are private (Epoch AI). Only 12 are public. Use source = 'local' if TSAI gets them."
@@ -252,6 +256,18 @@
       "status": "planned",
       "reason": "Tasks are JSON files in a GitHub repo. Needs a reader for the task files."
     },
+    "livecodebench": {
+      "status": "planned",
+      "reason": "JSONL files on Hugging Face (release_v6, 1,055 problems). Needs a pinned revision and sha256, and templates for the problem text."
+    },
+    "aider_polyglot": {
+      "status": "planned",
+      "reason": "225 exercises in 6 languages, as folders in a GitHub repo. Needs a reader for the instructions and solutions."
+    },
+    "codeforces": {
+      "status": "planned",
+      "reason": "On Hugging Face (test split, 468 problems). Needs a pinned revision and sha256, and templates for the problem text."
+    },
     "indicgenbench": {
       "status": "planned",
       "reason": "A GitHub repo, not on Hugging Face. Needs the URL of each data file. Flores-IN is FLORES in Indian languages, which flores200 covers."
@@ -259,6 +275,10 @@
     "ruler": {
       "status": "skip",
       "reason": "Synthetic: examples are generated for each length at eval time. There is no fixed item to fingerprint."
+    },
+    "helmet": {
+      "status": "planned",
+      "reason": "21 source datasets with different fields, and some tasks are generated at eval time. Needs a reader for each dataset with fixed items. Not the long contexts."
     },
     "oneruler": {
       "status": "skip",

@@ -85,6 +85,14 @@ id = "{id}"
 texts = ["{question}", "{rationale}", "{question}\n{answer}"]
 canaries = ["{canary|guid}"]
 
+[aime]
+name = "AIME 2024 / 2025"
+status = "planned"
+tags = ["english", "math"]
+licence = "opencompass/AIME2025: MIT; HuggingFaceH4/aime_2024: none stated; the problems are (c) MAA"
+repo = "HuggingFaceH4/aime_2024 + opencompass/AIME2025"
+reason = "30 + 30 problems in two Hugging Face repos. The registry takes one repo per benchmark, so it needs an entry for each year, with pinned revisions and sha256."
+
 [frontiermath]
 name = "FrontierMath"
 status = "skip"
@@ -219,6 +227,30 @@ licence = "Apache-2.0"
 repo = "xlang-ai/OSWorld"
 reason = "Tasks are JSON files in a GitHub repo. Needs a reader for the task files."
 
+[livecodebench]
+name = "LiveCodeBench"
+status = "planned"
+tags = ["code"]
+licence = "Unclear: code MIT, dataset card \"cc\""
+repo = "livecodebench/code_generation_lite"
+reason = "JSONL files on Hugging Face (release_v6, 1,055 problems). Needs a pinned revision and sha256, and templates for the problem text."
+
+[aider_polyglot]
+name = "Aider Polyglot"
+status = "planned"
+tags = ["code"]
+licence = "Unclear: no LICENSE file (exercises adapted from Exercism)"
+repo = "Aider-AI/polyglot-benchmark"
+reason = "225 exercises in 6 languages, as folders in a GitHub repo. Needs a reader for the instructions and solutions."
+
+[codeforces]
+name = "Codeforces"
+status = "planned"
+tags = ["code"]
+licence = "CC-BY-4.0 and ODC-By-4.0 (open-r1 packaging; the problems come from Codeforces)"
+repo = "open-r1/codeforces"
+reason = "On Hugging Face (test split, 468 problems). Needs a pinned revision and sha256, and templates for the problem text."
+
 # ---------------------------------------------------------------- Indic
 
 [milu]
@@ -334,6 +366,14 @@ tags = ["english", "long_context"]
 licence = "Apache-2.0"
 repo = "NVIDIA/RULER"
 reason = "Synthetic: examples are generated for each length at eval time. There is no fixed item to fingerprint."
+
+[helmet]
+name = "HELMET"
+status = "planned"
+tags = ["english", "long_context"]
+licence = "MIT (code); data keeps each source dataset's licence"
+repo = "princeton-nlp/HELMET"
+reason = "21 source datasets with different fields, and some tasks are generated at eval time. Needs a reader for each dataset with fixed items. Not the long contexts."
 
 [longbench_v2]
 name = "LongBench v2"
