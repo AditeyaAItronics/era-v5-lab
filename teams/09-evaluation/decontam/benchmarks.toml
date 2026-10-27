@@ -150,7 +150,7 @@ name = "Terminal-Bench 2.0"
 status = "planned"
 tags = ["code", "agentic"]
 licence = "Apache-2.0"
-repo = "laude-institute/terminal-bench-2"
+repo = "harbor-framework/terminal-bench-2"
 reason = "Tasks are folders in a GitHub repo. Needs a reader for task instructions and solutions."
 
 [tau2_bench]
