@@ -44,6 +44,8 @@ One output line per flagged document (the script never prints document text):
 The first stderr line gives the `set_sha256` and the scope. Only the **full set** (no `--benchmarks`,
 no `--tags`) is the formal check before a shard goes into training. Give the `set_sha256` in your report.
 The script checks the sha256 of every file before it starts. It needs about 1.1 GB of memory.
+Build and run on Linux (cluster, Colab, Kaggle). On Windows, clone with `git clone -c core.autocrlf=false …`,
+otherwise Git checks the files out as CRLF, every sha256 check fails, and a build gives a different `set_sha256`.
 
 ## The fingerprint set (v1)
 

@@ -220,6 +220,9 @@ class Fingerprints:
                 want, rel = line.split("  ", 1)
                 if hashlib.sha256((d / rel).read_bytes()).hexdigest() != want:
                     raise ValueError(f"{rel}: sha256 does not match SHA256SUMS")
+            folders = {line.split("  ", 1)[1].split("/")[0] for line in sums.splitlines()}
+            if folders != set(self.manifest["benchmarks"]):
+                raise ValueError("the benchmarks in MANIFEST.json do not match SHA256SUMS")
         self.set_sha256 = self.manifest["set_sha256"]
         all_b = self.manifest["benchmarks"]
         chosen = list(benchmarks or all_b)
