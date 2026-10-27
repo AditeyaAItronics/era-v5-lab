@@ -214,6 +214,22 @@ def test_tampered_shard_is_rejected(toy, tmp_path):
         Fingerprints(tmp_path)
 
 
+def test_manifest_without_a_benchmark_is_rejected(toy, tmp_path):
+    # The top MANIFEST.json is not in SHA256SUMS, so a removed entry must be caught another way.
+    out, _, _ = toy
+    for f in out.rglob("*"):
+        if f.is_file():
+            dest = tmp_path / f.relative_to(out)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(f.read_bytes())
+    top = tmp_path / "MANIFEST.json"
+    manifest = json.loads(top.read_text(encoding="utf-8"))
+    del manifest["benchmarks"]["toy"]
+    top.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        Fingerprints(tmp_path)
+
+
 # ---- known leak must be found ----
 
 def test_known_leak_is_found_with_item_and_offset(toy):
