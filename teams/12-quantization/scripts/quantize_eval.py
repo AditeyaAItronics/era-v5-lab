@@ -45,8 +45,10 @@ def find_bin(name, bindir):
 
 def llama_build(cli):
     out = subprocess.run([cli, '--version'], capture_output=True, text=True)
-    m = re.search(r'version: (\d+) \((\w+)\)', out.stdout + out.stderr)
-    if not m: sys.exit('cannot read the llama.cpp version')
+    text = out.stdout + out.stderr
+    # 'version: 0.7.0 (build 11669, commit 620d2225c)' (0.7+, e.g. Homebrew) or 'version: 10050 (b15ca938a)' (older)
+    m = re.search(r'build (\d+), commit (\w+)', text) or re.search(r'version: (\d+) \((\w+)\)', text)
+    if not m: sys.exit(f'cannot read the llama.cpp version from: {text.strip()[:200]!r}')
     return int(m.group(1)), m.group(2)
 
 
