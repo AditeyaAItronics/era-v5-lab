@@ -126,9 +126,13 @@ if not LOCAL_TEST:
         caps = sorted({c.replace(".", "") for c in subprocess.run("nvidia-smi --query-gpu=compute_cap --format=csv,noheader",
                        shell=True, capture_output=True, text=True).stdout.split()}) or ["75"]
         ENV["cuda_arch"] = caps; save_env()
+        # -v makes the build print ninja's [done/total] counter; the full output goes to the log, the counter here
+        build_log = f"{OUT}/logs/build_llama_cpp_python.log"
+        print("compiling llama-cpp-python with CUDA: ~15-30 min; progress every ~20 kernels below")
         sh(f'CMAKE_ARGS="-DGGML_CUDA=on -DGGML_CUDA_NO_VMM=ON -DCMAKE_CUDA_ARCHITECTURES={";".join(caps)}" '
-           f'pip wheel --no-deps --no-cache-dir -w {WHEELS} llama-cpp-python=={LLAMA_CPP_PYTHON}',
-           log=f"{OUT}/logs/build_llama_cpp_python.log")
+           f'pip wheel -v --no-deps --no-cache-dir -w {WHEELS} llama-cpp-python=={LLAMA_CPP_PYTHON} 2>&1 '
+           f'| tee {build_log} | grep --line-buffered -E "^ *[[][0-9]+/[0-9]+[]]" | awk "NR % 20 == 1 {{print; fflush()}}" ; '
+           f'ls {WHEELS}/llama_cpp_python-*.whl >/dev/null || (tail -40 {build_log}; false)')
         wheels = glob.glob(f"{WHEELS}/llama_cpp_python-{LLAMA_CPP_PYTHON}-*.whl")
     sh(f"pip install -q {wheels[0]} lm_eval==0.4.13 datasets==5.1.0", log=f"{OUT}/logs/pip.log")
 import importlib, llama_cpp, lm_eval, datasets
