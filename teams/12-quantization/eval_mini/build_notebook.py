@@ -205,10 +205,12 @@ for fmt in FORMATS:
     try:
         run_format(fmt, gguf, gpu_layers)
     except RuntimeError:
-        if fmt != "bf16":
+        # retry with fewer GPU layers only for bf16 and only when the failure was GPU memory; anything else is a bug
+        tail = open(f"{OUT}/logs/run_{fmt}.log").read()[-20000:].lower()
+        if fmt != "bf16" or not any(k in tail for k in ("out of memory", "failed to allocate", "cudamalloc")):
             raise
-        gpu_layers = BF16_FALLBACK_GPU_LAYERS   # bf16 did not fit with every layer on the GPU
-        print(f"bf16 failed with all layers on the GPU; retrying with {gpu_layers} GPU layers")
+        gpu_layers = BF16_FALLBACK_GPU_LAYERS
+        print(f"bf16 ran out of GPU memory with all layers on the GPU; retrying with {gpu_layers} GPU layers")
         run_format(fmt, gguf, gpu_layers)
     ENV["formats"][fmt] = {"gpu_layers": gpu_layers, "gguf_bytes": os.path.getsize(gguf),
                            "wall_clock_s": round(time.time() - t0), "finished": datetime.datetime.now().isoformat(timespec="seconds")}

@@ -96,8 +96,10 @@ def main() -> None:
         t = time.perf_counter()
         results = lm_eval.simple_evaluate(
             model=lm, tasks=[name], num_fewshot=run.num_fewshot or None, limit=limit, log_samples=True,
-            random_seed=g9.DEFAULT_SEED, numpy_random_seed=g9.DEFAULT_SEED, torch_random_seed=g9.DEFAULT_SEED,
-            fewshot_random_seed=g9.DEFAULT_SEED)
+            random_seed=g9.DEFAULT_SEED, numpy_random_seed=g9.DEFAULT_SEED, fewshot_random_seed=g9.DEFAULT_SEED,
+            # no torch seed: this backend does not use torch, and setting it imports torch, which is broken on
+            # Kaggle (libtorch_cuda: undefined symbol ncclCommShrink). G9's other three seeds are unchanged.
+            torch_random_seed=None)
         secs = time.perf_counter() - t
         context = {"model": args.model, "model_revision": args.revision, "dtype": args.format,
                    "profile": args.profile, "limit": limit, "seed": g9.DEFAULT_SEED,
