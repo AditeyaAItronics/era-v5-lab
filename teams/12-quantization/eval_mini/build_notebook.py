@@ -170,7 +170,9 @@ if not os.path.exists(BF16):
     from huggingface_hub import snapshot_download
     hf = snapshot_download(MODEL, revision=REVISION, local_dir=f"{WORK}/hf",
                            allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt"])
-    sh(f"{CONV}/bin/python {WORK}/llama.cpp/convert_hf_to_gguf.py {hf} --outtype bf16 --outfile {BF16}", log=f"{OUT}/logs/convert.log")
+    # env -u PYTHONPATH: Kaggle injects a sitecustomize hook through PYTHONPATH that needs packages this venv lacks
+    sh(f"env -u PYTHONPATH {CONV}/bin/python {WORK}/llama.cpp/convert_hf_to_gguf.py {hf} --outtype bf16 --outfile {BF16}",
+       log=f"{OUT}/logs/convert.log")
     shutil.rmtree(f"{WORK}/hf", ignore_errors=True)
 ENV["bf16_gguf_bytes"] = os.path.getsize(BF16); save_env()
 print(BF16, round(os.path.getsize(BF16) / 1e9, 2), "GB")
