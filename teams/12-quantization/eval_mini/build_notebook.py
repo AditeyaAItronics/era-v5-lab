@@ -212,10 +212,23 @@ zip_path = shutil.make_archive(RUNS, "zip", RUNS)
 print("\\nEverything is in", RUNS, "and", zip_path)
 n_files = sum(len(f) for _, _, f in os.walk(RUNS)); print(n_files, "files:", sorted(os.listdir(RUNS)))
 """),
+code("""
+# bring the results back to the machine running VS Code: the zip, as base64 text in this cell's output. With a
+# Colab kernel every file above lives on Google's VM; cell outputs are what VS Code keeps when you save the
+# notebook. Locally: python extract_results.py eval_mini_colab.ipynb  -> writes the zip next to the notebook.
+import base64
+blob = base64.b64encode(open(zip_path, "rb").read()).decode()
+print(f"EVAL_MINI_ZIP_BEGIN {os.path.basename(zip_path)} {len(blob)}")
+for i in range(0, len(blob), 4000):
+    print(blob[i:i + 4000])
+print("EVAL_MINI_ZIP_END")
+"""),
 md("""
 ## Send back
 
-The zip printed above (`runs_limit5.zip` for the test run, `runs.zip` for the full run): per format a `summary.json`
+**Save the notebook in VS Code** (the last cell's output carries the results), then locally run
+`python extract_results.py eval_mini_colab.ipynb`. It writes the zip (`runs_limit5.zip` for the test run, `runs.zip`
+for the full run): per format a `summary.json`
 (G9's record format) and one `*.samples.jsonl` per task; `scores.csv`, `scores_long.csv`, `paired.md`,
 `environment.json` (GPU, versions, settings, per-format GPU layers and time) and `logs/`. From Drive, or if Drive
 did not mount, download it from the runtime before the session ends.
