@@ -162,9 +162,11 @@ if not os.path.exists(BF16):
     # the converter's own requirements (pinned torch, numpy, ...) go into a separate venv, so they cannot replace
     # packages this notebook has already imported
     CONV = f"{WORK}/convert-venv"
-    if not os.path.exists(f"{CONV}/bin/python"):
-        sh(f"python -m venv {CONV} && {CONV}/bin/pip install -q -r {WORK}/llama.cpp/requirements/requirements-convert_hf_to_gguf.txt "
-           f"{WORK}/llama.cpp/gguf-py", log=f"{OUT}/logs/convert_venv.log")
+    if not os.path.exists(f"{CONV}/.ready"):   # uv: Kaggle's python has no ensurepip, so plain venv fails
+        sh(f"rm -rf {CONV} && pip install -q uv && uv venv -q --python python3 {CONV} "
+           f"&& uv pip install -q --python {CONV}/bin/python --index-strategy unsafe-best-match "
+           f"-r {WORK}/llama.cpp/requirements/requirements-convert_hf_to_gguf.txt {WORK}/llama.cpp/gguf-py "
+           f"&& touch {CONV}/.ready", log=f"{OUT}/logs/convert_venv.log")
     from huggingface_hub import snapshot_download
     hf = snapshot_download(MODEL, revision=REVISION, local_dir=f"{WORK}/hf",
                            allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt"])
