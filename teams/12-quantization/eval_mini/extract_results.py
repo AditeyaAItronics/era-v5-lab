@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Recover the results zip that eval_mini_colab.ipynb's last cell prints as base64.
+"""Recover the results zip that eval_mini.ipynb's last cell prints as base64.
 
-    python extract_results.py eval_mini_colab.ipynb [--out DIR]
+    python extract_results.py eval_mini.ipynb [--out DIR]
 
 With a Colab kernel attached from VS Code, the notebook's files stay on Google's VM; the last cell prints the
 results zip between EVAL_MINI_ZIP_BEGIN / EVAL_MINI_ZIP_END, and saving the notebook keeps that output locally.

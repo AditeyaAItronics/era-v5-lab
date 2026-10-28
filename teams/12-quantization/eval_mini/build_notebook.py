@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build eval_mini_colab.ipynb from the .py files next to it.
+"""Build eval_mini.ipynb (Kaggle or Colab) from the .py files next to it.
 
     python build_notebook.py
 
@@ -7,7 +7,7 @@ The notebook carries its own copy of llamacpp_lm.py, run_mini_gguf.py and paired
 first code cell), so it runs without this branch being pushed. The .py files stay the source of truth: edit
 them, then rebuild. G9's run_eval_mini.py is still fetched from upstream main, where it is published.
 
-Local test (same cells, no Colab): EVAL_MINI_LOCAL_TEST=1 jupyter nbconvert --execute eval_mini_colab.ipynb
+Local test (same cells, no GPU box): EVAL_MINI_LOCAL_TEST=1 jupyter nbconvert --execute eval_mini.ipynb
 uses the GGUFs in ~/.cache/era-v5-quant, two formats and a few items per task.
 """
 import json
@@ -28,19 +28,21 @@ def code(s):
 
 CELLS = [
 md("""
-# G12: G9's eval_mini on OLMoE GGUF files (Colab T4)
+# G12: G9's eval_mini on OLMoE GGUF files (Kaggle or Colab)
 
 Runs G9's **mini** profile (ARC-C 500, HellaSwag 400, MMLU 570, GSM8K 200, TruthfulQA-mc2 200; G9's shots, limits
 and seed) on **bf16 and six llama.cpp formats**, all through one backend (llama-cpp-python in-process; see
 `llamacpp_lm.py` for why not llama-server), with **per-item logs**, then compares each format with bf16 item by
 item (`paired.py`).
 
-**Runtime:** T4 GPU. Then **Run all**. Every step stops the run if it fails.
+Every step stops the run if it fails. The notebook detects where it runs:
 
-- Output goes to Google Drive when it can be mounted, else to `/content/eval_mini_out` (download the zip at the
-  end). Each task is saved as soon as it finishes; **Run all again after a disconnect** and finished tasks are
-  skipped. The compiled llama-cpp-python is cached next to the output, so a second session skips the compile.
-- First run: keep `LIMIT = 5` (~30-40 min, mostly the one-time compile and model conversion). Then set
+- **Kaggle:** Settings → Accelerator **GPU T4 x2**, Internet **on**. For the full run use **Save Version → Save & Run
+  All (Commit)**: it runs in the background (up to 12 h) and `/kaggle/working/eval_mini_out/` becomes the version's
+  downloadable Output. Model files go to `/kaggle/tmp` (outside the 20 GB output limit).
+- **Colab:** T4 runtime, Run all. Output to Google Drive if it mounts (then a second session reuses the compiled
+  build and skips finished tasks), else to the runtime, with the zip also printed by the last cell.
+- First run: keep `LIMIT = 5` (~30-40 min, mostly compiling llama-cpp-python and converting the model). Then set
   `LIMIT = None` for the full run (estimate: ~25 min per quantized format, ~1-1.5 h for bf16).
 """),
 code("""
@@ -52,26 +54,29 @@ MODEL, REVISION = "allenai/OLMoE-1B-7B-0924", "6d84c48581ece794365f2b8e9cfb043c6
 LLAMA_TAG = "b11669"           # llama.cpp build of the team's conversion/quantization
 LLAMA_CPP_PYTHON = "0.3.36"    # in-process log-probabilities checked correct with this version
 G9_RAW = "https://raw.githubusercontent.com/theschoolofai/era-v5-lab/main/teams/09-evaluation/harness/run_eval_mini.py"
-DRIVE_DIR = "/content/drive/MyDrive/era-v5-g12/eval_mini"   # used when Drive mounts
-LOCAL_OUT = "/content/eval_mini_out"                        # used otherwise
-WORK      = "/content/work"                                 # model files, rebuilt per session
-BF16_FALLBACK_GPU_LAYERS = 12  # of 16 layers, only if bf16 does not fit on the GPU
+DRIVE_DIR = "/content/drive/MyDrive/era-v5-g12/eval_mini"   # Colab, when Drive mounts
+BF16_FALLBACK_GPU_LAYERS = 12  # of 16 layers, only if bf16 does not fit on the GPU(s)
 
 import os
 if os.environ.get("EVAL_MINI_LOCAL_TEST"):   # dry run of these same cells on a Mac (see build_notebook.py)
     LIMIT, FORMATS, BASE = 2, ["Q8_0", "Q2_K"], "Q8_0"
-    LOCAL_OUT = os.environ.get("EVAL_MINI_OUT", "/tmp/eval_mini_local")
-    WORK = os.path.expanduser("~/.cache/era-v5-quant")
 """),
 code("""
 import datetime, glob, json, os, platform, shutil, subprocess, sys, time
 LOCAL_TEST = bool(os.environ.get("EVAL_MINI_LOCAL_TEST"))
+IN_KAGGLE = os.path.isdir("/kaggle/working")
 try:
     import google.colab  # noqa: F401
     IN_COLAB = True
 except ImportError:
     IN_COLAB = False
 
+if LOCAL_TEST:
+    LOCAL_OUT, WORK = os.environ.get("EVAL_MINI_OUT", "/tmp/eval_mini_local"), os.path.expanduser("~/.cache/era-v5-quant")
+elif IN_KAGGLE:
+    LOCAL_OUT, WORK = "/kaggle/working/eval_mini_out", "/kaggle/tmp/eval_mini_work"   # output vs big files
+else:
+    LOCAL_OUT, WORK = "/content/eval_mini_out", "/content/work"
 OUT = LOCAL_OUT
 if IN_COLAB:
     try:
@@ -92,7 +97,8 @@ def sh(cmd, log=None):
     if rc != 0:
         raise RuntimeError(f"command failed (exit {rc}): {cmd}" + (f"; see {log}" if log else ""))
 
-ENV = {"started": datetime.datetime.now().isoformat(timespec="seconds"), "in_colab": IN_COLAB, "local_test": LOCAL_TEST,
+PLATFORM = "local-test" if LOCAL_TEST else "kaggle" if IN_KAGGLE else "colab" if IN_COLAB else "other"
+ENV = {"started": datetime.datetime.now().isoformat(timespec="seconds"), "platform": PLATFORM,
        "output_dir": OUT, "settings": {k: globals()[k] for k in ("LIMIT", "FORMATS", "BASE", "MODEL", "REVISION",
        "LLAMA_TAG", "LLAMA_CPP_PYTHON", "BF16_FALLBACK_GPU_LAYERS")}, "python": platform.python_version(), "formats": {}}
 def save_env():
@@ -102,25 +108,33 @@ if shutil.which("nvidia-smi"):
                                 shell=True, capture_output=True, text=True).stdout.strip()
     sh("nvidia-smi")
 sh(f"df -h {WORK} | tail -1")
+if not LOCAL_TEST:   # Kaggle needs Internet switched on in the notebook settings
+    sh("curl -fsS -o /dev/null https://huggingface.co || (echo 'NO INTERNET: turn it on in the notebook settings' && false)")
 save_env()
-print("output:", OUT)
+print("platform:", PLATFORM, "| output:", OUT, "| model files:", WORK)
 """),
 "__SOURCE_CELL__",
 code("""
-# llama-cpp-python with CUDA, lm_eval and datasets at G9's pins. The CUDA build is compiled once (~15-25 min on
-# Colab's 2 CPUs) into a wheel kept in OUT/wheels; later sessions install it in seconds.
+# llama-cpp-python with CUDA (compiled here, ~10-25 min), lm_eval and datasets at G9's pins. The wheel is kept
+# where it survives a new session (Colab: Drive), so a later session installs it in seconds.
+# GGML_CUDA_NO_VMM: Kaggle's build image has no libcuda for CMake to link (found by Rahul, perplexity/README.md).
 if not LOCAL_TEST:
-    wheels = glob.glob(f"{OUT}/wheels/llama_cpp_python-{LLAMA_CPP_PYTHON}-*.whl")
+    WHEELS = f"{OUT}/wheels" if OUT == DRIVE_DIR else f"{WORK}/wheels"
+    wheels = glob.glob(f"{WHEELS}/llama_cpp_python-{LLAMA_CPP_PYTHON}-*.whl")
     if not wheels:
-        os.makedirs(f"{OUT}/wheels", exist_ok=True)
-        sh(f'CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=75" pip wheel --no-deps --no-cache-dir '
-           f'-w {OUT}/wheels llama-cpp-python=={LLAMA_CPP_PYTHON}', log=f"{OUT}/logs/build_llama_cpp_python.log")
-        wheels = glob.glob(f"{OUT}/wheels/llama_cpp_python-{LLAMA_CPP_PYTHON}-*.whl")
+        os.makedirs(WHEELS, exist_ok=True)
+        caps = sorted({c.replace(".", "") for c in subprocess.run("nvidia-smi --query-gpu=compute_cap --format=csv,noheader",
+                       shell=True, capture_output=True, text=True).stdout.split()}) or ["75"]
+        ENV["cuda_arch"] = caps; save_env()
+        sh(f'CMAKE_ARGS="-DGGML_CUDA=on -DGGML_CUDA_NO_VMM=ON -DCMAKE_CUDA_ARCHITECTURES={";".join(caps)}" '
+           f'pip wheel --no-deps --no-cache-dir -w {WHEELS} llama-cpp-python=={LLAMA_CPP_PYTHON}',
+           log=f"{OUT}/logs/build_llama_cpp_python.log")
+        wheels = glob.glob(f"{WHEELS}/llama_cpp_python-{LLAMA_CPP_PYTHON}-*.whl")
     sh(f"pip install -q {wheels[0]} lm_eval==0.4.13 datasets==5.1.0", log=f"{OUT}/logs/pip.log")
 import importlib, llama_cpp, lm_eval, datasets
 gpu_ok = llama_cpp.llama_supports_gpu_offload()
-if IN_COLAB and not gpu_ok:
-    raise RuntimeError("llama-cpp-python has no GPU offload: delete OUT/wheels and rerun to rebuild it with CUDA")
+if not LOCAL_TEST and not gpu_ok:
+    raise RuntimeError("llama-cpp-python has no GPU offload: delete the wheels folder and rerun to rebuild it with CUDA")
 ENV["packages"] = {"llama_cpp_python": llama_cpp.__version__, "lm_eval": lm_eval.__version__,
                    "datasets": datasets.__version__, "gpu_offload": gpu_ok}
 save_env(); print(ENV["packages"])
@@ -141,11 +155,16 @@ if not LOCAL_TEST and not os.path.exists(QUANTIZE):
     sh(f"cmake -S {WORK}/llama.cpp -B {WORK}/llama.cpp/build -DLLAMA_CURL=OFF -DGGML_CUDA=OFF "
        f"&& cmake --build {WORK}/llama.cpp/build -j --target llama-quantize", log=f"{OUT}/logs/build_llama_quantize.log")
 if not os.path.exists(BF16):
-    sh(f"pip install -q {WORK}/llama.cpp/gguf-py sentencepiece", log=f"{OUT}/logs/pip.log")
+    # the converter's own requirements (pinned torch, numpy, ...) go into a separate venv, so they cannot replace
+    # packages this notebook has already imported
+    CONV = f"{WORK}/convert-venv"
+    if not os.path.exists(f"{CONV}/bin/python"):
+        sh(f"python -m venv {CONV} && {CONV}/bin/pip install -q -r {WORK}/llama.cpp/requirements/requirements-convert_hf_to_gguf.txt "
+           f"{WORK}/llama.cpp/gguf-py", log=f"{OUT}/logs/convert_venv.log")
     from huggingface_hub import snapshot_download
     hf = snapshot_download(MODEL, revision=REVISION, local_dir=f"{WORK}/hf",
                            allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt"])
-    sh(f"python {WORK}/llama.cpp/convert_hf_to_gguf.py {hf} --outtype bf16 --outfile {BF16}", log=f"{OUT}/logs/convert.log")
+    sh(f"{CONV}/bin/python {WORK}/llama.cpp/convert_hf_to_gguf.py {hf} --outtype bf16 --outfile {BF16}", log=f"{OUT}/logs/convert.log")
     shutil.rmtree(f"{WORK}/hf", ignore_errors=True)
 ENV["bf16_gguf_bytes"] = os.path.getsize(BF16); save_env()
 print(BF16, round(os.path.getsize(BF16) / 1e9, 2), "GB")
@@ -213,21 +232,25 @@ print("\\nEverything is in", RUNS, "and", zip_path)
 n_files = sum(len(f) for _, _, f in os.walk(RUNS)); print(n_files, "files:", sorted(os.listdir(RUNS)))
 """),
 code("""
-# bring the results back to the machine running VS Code: the zip, as base64 text in this cell's output. With a
-# Colab kernel every file above lives on Google's VM; cell outputs are what VS Code keeps when you save the
-# notebook. Locally: python extract_results.py eval_mini_colab.ipynb  -> writes the zip next to the notebook.
+# Colab without Drive only: the zip as base64 text in this cell's output, so it survives the runtime (e.g. a
+# Colab kernel attached from VS Code: files stay on Google's VM, cell outputs are saved with the notebook).
+# Locally: python extract_results.py eval_mini.ipynb  -> writes the zip next to the notebook.
 import base64
-blob = base64.b64encode(open(zip_path, "rb").read()).decode()
-print(f"EVAL_MINI_ZIP_BEGIN {os.path.basename(zip_path)} {len(blob)}")
-for i in range(0, len(blob), 4000):
-    print(blob[i:i + 4000])
-print("EVAL_MINI_ZIP_END")
+if IN_COLAB and OUT != DRIVE_DIR:
+    blob = base64.b64encode(open(zip_path, "rb").read()).decode()
+    print(f"EVAL_MINI_ZIP_BEGIN {os.path.basename(zip_path)} {len(blob)}")
+    for i in range(0, len(blob), 4000):
+        print(blob[i:i + 4000])
+    print("EVAL_MINI_ZIP_END")
+else:
+    print("results:", zip_path, "(Kaggle: the version's Output tab; Colab with Drive: the Drive folder)")
 """),
 md("""
 ## Send back
 
-**Save the notebook in VS Code** (the last cell's output carries the results), then locally run
-`python extract_results.py eval_mini_colab.ipynb`. It writes the zip (`runs_limit5.zip` for the test run, `runs.zip`
+**Kaggle:** download `eval_mini_out/runs*.zip` from the version's Output tab. **Colab with Drive:** it is in the
+Drive folder. **Colab without Drive:** save the notebook, then locally `python extract_results.py eval_mini.ipynb`.
+The zip (`runs_limit5.zip` for the test run, `runs.zip`
 for the full run): per format a `summary.json`
 (G9's record format) and one `*.samples.jsonl` per task; `scores.csv`, `scores_long.csv`, `paired.md`,
 `environment.json` (GPU, versions, settings, per-format GPU layers and time) and `logs/`. From Drive, or if Drive
@@ -248,7 +271,7 @@ def build() -> Path:
           "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
                        "language_info": {"name": "python"}, "accelerator": "GPU",
                        "colab": {"provenance": [], "gpuType": "T4"}}}
-    out = HERE / "eval_mini_colab.ipynb"
+    out = HERE / "eval_mini.ipynb"
     out.write_text(json.dumps(nb, indent=1, ensure_ascii=True) + "\n")
     return out
 

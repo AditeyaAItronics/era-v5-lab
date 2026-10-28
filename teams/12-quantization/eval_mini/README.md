@@ -8,7 +8,7 @@ llama.cpp formats, with **per-item logs**, and compares each format with bf16 **
 | [`llamacpp_lm.py`](llamacpp_lm.py) | lm-evaluation-harness model class: a GGUF file run in-process with llama-cpp-python |
 | [`run_mini_gguf.py`](run_mini_gguf.py) | one GGUF through G9's profile; writes G9's record format + per-item `*.samples.jsonl` |
 | [`paired.py`](paired.py) | each format vs bf16 on the same items: difference, 95% CI, McNemar's exact test |
-| [`eval_mini_colab.ipynb`](eval_mini_colab.ipynb) | Colab T4 notebook: build, convert, run every format, compare; resumable; carries its own copy of the three files above |
+| [`eval_mini.ipynb`](eval_mini.ipynb) | Kaggle or Colab notebook: build, convert, run every format, compare; resumable; carries its own copy of the three files above |
 | [`build_notebook.py`](build_notebook.py) | rebuilds the notebook from the three `.py` files (edit those, then rebuild) |
 | [`extract_results.py`](extract_results.py) | recovers the results zip that the notebook's last cell prints (for a Colab kernel attached from VS Code) |
 
@@ -40,7 +40,10 @@ log p(" Paris" | …) = −0.49, the same as greedy generation reports.
   every cell runs, all outputs are written (per-format `summary.json` + `*.samples.jsonl`, `scores.csv`,
   `paired.md`, `environment.json`, logs, a zip), and a second run skips the finished formats.
 
-Not yet checked: the Colab-only steps (CUDA build of llama-cpp-python, Drive, whether bf16 fits the T4) and timings.
+- The converter's separate environment builds from llama.cpp's requirements file (32 s) with the versions that
+  made the team's bf16 file.
+
+Not yet checked: the GPU-only steps (CUDA build of llama-cpp-python, bf16 on the T4s) and timings.
 
 ## Run
 
@@ -51,13 +54,18 @@ python run_mini_gguf.py --gguf OLMoE-1B-7B-0924-Q8_0.gguf --format Q8_0 --out ru
 python paired.py runs --base bf16
 ```
 
-On Colab: open `eval_mini_colab.ipynb`, choose a T4 runtime, Run all. It starts with `LIMIT = 5` (a quick end-to-end
-test, results under `runs_limit5/`); set `LIMIT = None` for the full run (`runs/`). Every step stops the run if it
-fails, and finished tasks are skipped on the next Run all.
+**Kaggle (recommended):** upload `eval_mini.ipynb` (Create → New Notebook → File → Import Notebook), set
+Accelerator **GPU T4 x2** and Internet **on**. It starts with `LIMIT = 5`, a quick end-to-end test: run all cells
+interactively (results in `/kaggle/working/eval_mini_out/runs_limit5/`). For the full run set `LIMIT = None` and use
+**Save Version → Save & Run All (Commit)**: it runs in the background and the results zip appears in that version's
+Output tab. Big files go to `/kaggle/tmp`, outside the 20 GB output limit; bf16 splits across the two T4s.
 
-With a Colab kernel attached from VS Code, the notebook's files live on Google's VM, not locally. The last cell
-prints the results zip as base64; save the notebook, then `python extract_results.py eval_mini_colab.ipynb`
-writes the zip next to it (it checks the length, so a truncated output is reported, not silently decoded).
+**Colab:** T4 runtime, Run all. Output goes to Drive if it mounts; otherwise (e.g. a Colab kernel attached from VS
+Code, where files stay on Google's VM) the last cell prints the results zip as base64; save the notebook, then
+`python extract_results.py eval_mini.ipynb` rebuilds it locally (it checks the length, so a truncated output is
+reported, not silently decoded).
+
+Every step stops the run if it fails, and finished tasks are skipped on the next run in the same session.
 
 Comparing with bf16 needs bf16 itself to run through this same backend: switching backends moves scores by
 about as much as the quantization effects being measured (G9's noise note: ~2 points per 100 items from a kernel
