@@ -8,7 +8,8 @@ llama.cpp formats, with **per-item logs**, and compares each format with bf16 **
 | [`llamacpp_lm.py`](llamacpp_lm.py) | lm-evaluation-harness model class: a GGUF file run in-process with llama-cpp-python |
 | [`run_mini_gguf.py`](run_mini_gguf.py) | one GGUF through G9's profile; writes G9's record format + per-item `*.samples.jsonl` |
 | [`paired.py`](paired.py) | each format vs bf16 on the same items: difference, 95% CI, McNemar's exact test |
-| [`eval_mini_colab.ipynb`](eval_mini_colab.ipynb) | Colab T4 notebook: build, convert, run every format, compare; resumable, results to Drive |
+| [`eval_mini_colab.ipynb`](eval_mini_colab.ipynb) | Colab T4 notebook: build, convert, run every format, compare; resumable; carries its own copy of the three files above |
+| [`build_notebook.py`](build_notebook.py) | rebuilds the notebook from the three `.py` files (edit those, then rebuild) |
 
 ## Why not llama-server (or lm_eval's own GGUF backend)
 
@@ -34,8 +35,11 @@ log p(" Paris" | …) = −0.49, the same as greedy generation reports.
 - The prefix cache (a multiple-choice question is evaluated once, not once per answer) changes log-probabilities
   by at most 0.004 compared with evaluating every answer from scratch; greedy flags are identical.
 - `paired.py`'s McNemar p-values match hand-computed cases.
+- The whole notebook, run locally in its test mode (`EVAL_MINI_LOCAL_TEST=1`: two formats, 2 items per task):
+  every cell runs, all outputs are written (per-format `summary.json` + `*.samples.jsonl`, `scores.csv`,
+  `paired.md`, `environment.json`, logs, a zip), and a second run skips the finished formats.
 
-Not yet checked: the Colab T4 run itself (GPU build, bf16 fit, timings).
+Not yet checked: the Colab-only steps (CUDA build of llama-cpp-python, Drive, whether bf16 fits the T4) and timings.
 
 ## Run
 
@@ -46,7 +50,10 @@ python run_mini_gguf.py --gguf OLMoE-1B-7B-0924-Q8_0.gguf --format Q8_0 --out ru
 python paired.py runs --base bf16
 ```
 
-On Colab: open `eval_mini_colab.ipynb`, choose a T4 runtime, Run all. Set `LIMIT = 5` first for a quick end-to-end
-test. Comparing with bf16 needs bf16 itself to run through this same backend: switching backends moves scores by
+On Colab: open `eval_mini_colab.ipynb`, choose a T4 runtime, Run all. It starts with `LIMIT = 5` (a quick end-to-end
+test, results under `runs_limit5/`); set `LIMIT = None` for the full run (`runs/`). Every step stops the run if it
+fails, and finished tasks are skipped on the next Run all.
+
+Comparing with bf16 needs bf16 itself to run through this same backend: switching backends moves scores by
 about as much as the quantization effects being measured (G9's noise note: ~2 points per 100 items from a kernel
 change alone).
