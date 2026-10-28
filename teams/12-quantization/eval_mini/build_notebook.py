@@ -115,10 +115,18 @@ print("platform:", PLATFORM, "| output:", OUT, "| model files:", WORK)
 """),
 "__SOURCE_CELL__",
 code("""
-# llama-cpp-python with CUDA (compiled here, ~10-25 min), lm_eval and datasets at G9's pins. The wheel is kept
-# where it survives a new session (Colab: Drive), so a later session installs it in seconds.
+# llama-cpp-python with CUDA (compiled here, ~10-25 min). The wheel is kept where it survives a new session
+# (Colab: Drive), so a later session installs it in seconds.
 # GGML_CUDA_NO_VMM: Kaggle's build image has no libcuda for CMake to link (found by Rahul, perplexity/README.md).
-if not LOCAL_TEST:
+#
+# The evaluation runs in its OWN venv (EVAL_PY) holding only llama-cpp-python, lm_eval and datasets at G9's pins.
+# lm_eval imports torch and transformers whenever it finds them, and Kaggle's preinstalled ones fail to import
+# (torch: undefined symbol ncclCommShrink; transformers: a dependency version check). This venv has neither.
+if LOCAL_TEST:
+    LLAMA_SPEC, UV_PYTHON = f"llama-cpp-python=={LLAMA_CPP_PYTHON}", "3.12"   # uv builds it (Metal on a Mac)
+else:
+    UV_PYTHON = "python3"   # the platform's python, the one the wheel is built for
+    sh("pip install -q uv", log=f"{OUT}/logs/pip.log")
     WHEELS = f"{OUT}/wheels" if OUT == DRIVE_DIR else f"{WORK}/wheels"
     wheels = glob.glob(f"{WHEELS}/llama_cpp_python-{LLAMA_CPP_PYTHON}-*.whl")
     if not wheels:
@@ -134,13 +142,29 @@ if not LOCAL_TEST:
            f'| tee {build_log} | grep --line-buffered -E "^ *[[][0-9]+/[0-9]+[]]" | awk "NR % 20 == 1 {{print; fflush()}}" ; '
            f'ls {WHEELS}/llama_cpp_python-*.whl >/dev/null || (tail -40 {build_log}; false)')
         wheels = glob.glob(f"{WHEELS}/llama_cpp_python-{LLAMA_CPP_PYTHON}-*.whl")
-    sh(f"pip install -q {wheels[0]} lm_eval==0.4.13 datasets==5.1.0", log=f"{OUT}/logs/pip.log")
-import importlib, llama_cpp, lm_eval, datasets
-gpu_ok = llama_cpp.llama_supports_gpu_offload()
-if not LOCAL_TEST and not gpu_ok:
+    LLAMA_SPEC = wheels[0]
+
+EVAL_VENV = f"{WORK}/eval-venv"
+EVAL_PY = f"env -u PYTHONPATH {EVAL_VENV}/bin/python"   # also without Kaggle's PYTHONPATH sitecustomize hook
+if not os.path.exists(f"{EVAL_VENV}/.ready"):
+    sh(f"rm -rf {EVAL_VENV} && uv venv -q --python {UV_PYTHON} {EVAL_VENV} && uv pip install -q --python {EVAL_VENV}/bin/python "
+       f"{LLAMA_SPEC} lm_eval==0.4.13 datasets==5.1.0 && touch {EVAL_VENV}/.ready", log=f"{OUT}/logs/eval_venv.log")
+probe = f"{CODE}/probe_env.py"
+open(probe, "w").write(os.linesep.join([
+    "import importlib.util, json, llama_cpp, lm_eval, datasets, platform",
+    "print(json.dumps({'python': platform.python_version(), 'llama_cpp_python': llama_cpp.__version__,",
+    "  'lm_eval': lm_eval.__version__, 'datasets': datasets.__version__,",
+    "  'gpu_offload': bool(llama_cpp.llama_supports_gpu_offload()),",
+    "  'torch_visible': importlib.util.find_spec('torch') is not None,",
+    "  'transformers_visible': importlib.util.find_spec('transformers') is not None}))", ""]))
+res = subprocess.run(f"{EVAL_PY} {probe}", shell=True, capture_output=True, text=True)
+if res.returncode != 0:
+    raise RuntimeError("the evaluation venv does not work: " + res.stderr[-3000:])
+ENV["packages"] = json.loads(res.stdout.strip().splitlines()[-1])
+if not LOCAL_TEST and not ENV["packages"]["gpu_offload"]:
     raise RuntimeError("llama-cpp-python has no GPU offload: delete the wheels folder and rerun to rebuild it with CUDA")
-ENV["packages"] = {"llama_cpp_python": llama_cpp.__version__, "lm_eval": lm_eval.__version__,
-                   "datasets": datasets.__version__, "gpu_offload": gpu_ok}
+if ENV["packages"]["torch_visible"] or ENV["packages"]["transformers_visible"]:
+    raise RuntimeError(f"torch/transformers visible in the evaluation venv: {ENV['packages']}")
 save_env(); print(ENV["packages"])
 """),
 code("""
@@ -188,7 +212,7 @@ def finished(fmt):
     return os.path.exists(p) and {r["task"] for r in json.load(open(p))["records"]} >= set(TASKS)
 
 def run_format(fmt, gguf, gpu_layers):
-    sh(f"cd {CODE} && {sys.executable} run_mini_gguf.py --gguf {gguf} --format {fmt} --out {RUNS} "
+    sh(f"cd {CODE} && {EVAL_PY} run_mini_gguf.py --gguf {gguf} --format {fmt} --out {RUNS} "
        f"--g9-harness {CODE}/run_eval_mini.py --n-gpu-layers {gpu_layers}" + (f" --limit {LIMIT}" if LIMIT else ""),
        log=f"{OUT}/logs/run_{fmt}.log")
 
@@ -233,7 +257,7 @@ long.to_csv(f"{RUNS}/scores_long.csv", index=False)
 scores = long.pivot_table(index="format", columns="task", values="points").reindex([f for f in FORMATS if f in set(long.format)])
 scores.to_csv(f"{RUNS}/scores.csv")
 print(scores.to_string())
-sh(f"{sys.executable} {CODE}/paired.py {RUNS} --base {BASE} --out {RUNS}/paired.md")
+sh(f"{EVAL_PY} {CODE}/paired.py {RUNS} --base {BASE} --out {RUNS}/paired.md")
 ENV["finished"] = datetime.datetime.now().isoformat(timespec="seconds"); save_env()
 shutil.copy(f"{OUT}/environment.json", f"{RUNS}/environment.json")
 shutil.copytree(f"{OUT}/logs", f"{RUNS}/logs", dirs_exist_ok=True)
