@@ -10,7 +10,31 @@ llama.cpp formats, with **per-item logs**, and compares each format with bf16 **
 | [`paired.py`](paired.py) | each format vs bf16 on the same items: difference, 95% CI, McNemar's exact test |
 | [`eval_mini.ipynb`](eval_mini.ipynb) | Kaggle or Colab notebook: build, convert, run every format, compare; resumable; carries its own copy of the three files above |
 | [`build_notebook.py`](build_notebook.py) | rebuilds the notebook from the three `.py` files (edit those, then rebuild) |
+| [`combine.py`](combine.py) | merges the zips from several members, checks they used identical code and settings, writes scores + paired comparison |
 | [`extract_results.py`](extract_results.py) | recovers the results zip that the notebook's last cell prints (for a Colab kernel attached from VS Code) |
+
+## Team run: split the formats, combine the results
+
+bf16 is done (Kaggle 2×T4, 28 Oct; ARC-C 46.8, HellaSwag 66.0, MMLU 53.7, GSM8K 10.5, TruthfulQA-mc2 37.3). The six
+quantized formats are split between members, two each (~2 h per member on Kaggle, compile included):
+
+| Formats | Run by (GitHub handle) | Status |
+|---|---|---|
+| `Q8_0`, `Q6_K` | | |
+| `Q5_K_M`, `Q4_K_M` | | |
+| `Q3_K_M`, `Q2_K` | | |
+
+**For each member:** import `eval_mini.ipynb` into Kaggle (Accelerator **GPU T4 x2**, Internet **on**), set
+`FORMATS` and `RUN_BY` in the settings cell and nothing else, then **Save Version → Save & Run All (Commit)**.
+Download `eval_mini_out/runs_<formats>.zip` from the version's Output tab and send it to the person combining.
+Every format is checked by `test_llamacpp_lm.py` before it is scored; a failure stops the run.
+
+**Combining:** `python combine.py runs_bf16.zip runs_Q8_0-Q6_K.zip ... --out results/`. It accepts a run only if
+the model revision, profile, seed, n_ctx, lm_eval and llama-cpp-python versions, G9's runner and the full item counts
+match the bf16 run, and all runs carry the same notebook fingerprint (`NOTEBOOK_VERSION`); test runs (`LIMIT` set)
+are refused. Hardware may differ and is recorded per format in `provenance.json`.
+
+Do not edit the notebook between members' runs: any change to the embedded code changes the fingerprint.
 
 ## Why not llama-server (or lm_eval's own GGUF backend)
 

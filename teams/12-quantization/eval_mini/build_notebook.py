@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SOURCES = ["llamacpp_lm.py", "run_mini_gguf.py", "paired.py"]
+SOURCES = ["llamacpp_lm.py", "run_mini_gguf.py", "paired.py", "test_llamacpp_lm.py"]
 
 
 def md(s):
@@ -35,6 +35,11 @@ and seed) on **bf16 and six llama.cpp formats**, all through one backend (llama-
 `llamacpp_lm.py` for why not llama-server), with **per-item logs**, then compares each format with bf16 item by
 item (`paired.py`).
 
+**Team run (G12):** bf16 is done (Kaggle, 28 Oct). Each member runs the formats assigned to them: set `FORMATS` and
+`RUN_BY` in the settings cell, nothing else. Send the zip back; `combine.py` checks that every run used identical code
+and settings (the `NOTEBOOK_VERSION` fingerprint, model revision, llama.cpp build, lm_eval, seed, item counts) and
+compares every format with bf16 item by item.
+
 Every step stops the run if it fails. The notebook detects where it runs:
 
 - **Kaggle:** Settings → Accelerator **GPU T4 x2**, Internet **on**. For the full run use **Save Version → Save & Run
@@ -42,24 +47,27 @@ Every step stops the run if it fails. The notebook detects where it runs:
   downloadable Output. Model files go to `/kaggle/tmp` (outside the 20 GB output limit).
 - **Colab:** T4 runtime, Run all. Output to Google Drive if it mounts (then a second session reuses the compiled
   build and skips finished tasks), else to the runtime, with the zip also printed by the last cell.
-- First run: keep `LIMIT = 5` (~30-40 min, mostly compiling llama-cpp-python and converting the model). Then set
-  `LIMIT = None` for the full run (estimate: ~25 min per quantized format, ~1-1.5 h for bf16).
+- Time on Kaggle 2×T4: ~35 min to compile llama-cpp-python and convert the model, then ~25-45 min per format
+  (bf16 took 45 min). Two formats ≈ 2 h. `LIMIT = 5` gives a quick end-to-end check first if you want one.
 """),
 code("""
 # --- settings -----------------------------------------------------------------------------------------------
-LIMIT     = 5          # items per task for a test run (MMLU: per subject); None = G9's full mini profile
-FORMATS   = ["bf16", "Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M", "Q3_K_M", "Q2_K"]   # bf16 first: it is the baseline
-BASE      = "bf16"
+FORMATS   = ["Q8_0", "Q6_K"]   # <-- YOUR assigned formats (bf16 is already done; see the team table in README.md)
+RUN_BY    = ""                 # <-- your GitHub handle, recorded with the results
+LIMIT     = None               # None = G9's full mini profile; 5 = quick end-to-end check (not combinable)
+BASE      = "bf16"             # paired comparison is made against this when it is in the same run (combine.py otherwise)
 MODEL, REVISION = "allenai/OLMoE-1B-7B-0924", "6d84c48581ece794365f2b8e9cfb043c68ade9c5"  # team pin
 LLAMA_TAG = "b11669"           # llama.cpp build of the team's conversion/quantization
 LLAMA_CPP_PYTHON = "0.3.36"    # in-process log-probabilities checked correct with this version
 G9_RAW = "https://raw.githubusercontent.com/theschoolofai/era-v5-lab/main/teams/09-evaluation/harness/run_eval_mini.py"
 DRIVE_DIR = "/content/drive/MyDrive/era-v5-g12/eval_mini"   # Colab, when Drive mounts
 BF16_FALLBACK_GPU_LAYERS = 12  # of 16 layers, only if bf16 does not fit on the GPU(s)
+NOTEBOOK_VERSION = "__NOTEBOOK_VERSION__"   # fingerprint of the embedded code: combine.py requires the same one
+assert FORMATS and all(f in {"bf16", "Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M", "Q3_K_M", "Q2_K"} for f in FORMATS), FORMATS
 
 import os
 if os.environ.get("EVAL_MINI_LOCAL_TEST"):   # dry run of these same cells on a Mac (see build_notebook.py)
-    LIMIT, FORMATS, BASE = 2, ["Q8_0", "Q2_K"], "Q8_0"
+    LIMIT, FORMATS, BASE, RUN_BY = 2, ["Q8_0", "Q2_K"], "Q8_0", "local-test"
 """),
 code("""
 import datetime, glob, json, os, platform, shutil, subprocess, sys, time
@@ -99,7 +107,8 @@ def sh(cmd, log=None):
 
 PLATFORM = "local-test" if LOCAL_TEST else "kaggle" if IN_KAGGLE else "colab" if IN_COLAB else "other"
 ENV = {"started": datetime.datetime.now().isoformat(timespec="seconds"), "platform": PLATFORM,
-       "output_dir": OUT, "settings": {k: globals()[k] for k in ("LIMIT", "FORMATS", "BASE", "MODEL", "REVISION",
+       "output_dir": OUT, "run_by": RUN_BY, "notebook_version": NOTEBOOK_VERSION,
+       "settings": {k: globals()[k] for k in ("LIMIT", "FORMATS", "BASE", "MODEL", "REVISION",
        "LLAMA_TAG", "LLAMA_CPP_PYTHON", "BF16_FALLBACK_GPU_LAYERS")}, "python": platform.python_version(), "formats": {}}
 def save_env():
     json.dump(ENV, open(f"{OUT}/environment.json", "w"), indent=1)
@@ -205,7 +214,7 @@ code("""
 # every format: quantize (same rule as scripts/quantize_eval.py: output layer Q8_0 below 8 bits), run G9's profile,
 # save after each task. A format whose five tasks are all in its summary.json is skipped.
 TASKS = ["arc_challenge", "hellaswag", "mmlu", "gsm8k", "truthfulqa_mc2"]
-RUNS = f"{OUT}/runs" + (f"_limit{LIMIT}" if LIMIT else "")     # test runs never mix with the full run
+RUNS = f"{OUT}/runs_" + "-".join(FORMATS) + (f"_limit{LIMIT}" if LIMIT else "")   # unique per member; tests apart
 
 def finished(fmt):
     p = f"{RUNS}/{fmt}/summary.json"
@@ -225,6 +234,8 @@ for fmt in FORMATS:
     if not os.path.exists(gguf):
         extra = "" if fmt == "Q8_0" else "--output-tensor-type q8_0"
         sh(f"{QUANTIZE} {extra} {BF16} {gguf} {fmt}", log=f"{OUT}/logs/quantize_{fmt}.log"); made_here = True
+    # the shifted-logprob guard (instructor, 28 Oct): this file's scores must equal its own greedy generation's
+    sh(f"cd {CODE} && {EVAL_PY} test_llamacpp_lm.py {gguf}", log=f"{OUT}/logs/test_llamacpp_lm_{fmt}.log")
     gpu_layers = -1
     try:
         run_format(fmt, gguf, gpu_layers)
@@ -257,7 +268,10 @@ long.to_csv(f"{RUNS}/scores_long.csv", index=False)
 scores = long.pivot_table(index="format", columns="task", values="points").reindex([f for f in FORMATS if f in set(long.format)])
 scores.to_csv(f"{RUNS}/scores.csv")
 print(scores.to_string())
-sh(f"{EVAL_PY} {CODE}/paired.py {RUNS} --base {BASE} --out {RUNS}/paired.md")
+if os.path.exists(f"{RUNS}/{BASE}/summary.json"):
+    sh(f"{EVAL_PY} {CODE}/paired.py {RUNS} --base {BASE} --out {RUNS}/paired.md")
+else:
+    print(f"{BASE} is not in this run: the paired comparison is made when the runs are combined (combine.py)")
 ENV["finished"] = datetime.datetime.now().isoformat(timespec="seconds"); save_env()
 shutil.copy(f"{OUT}/environment.json", f"{RUNS}/environment.json")
 shutil.copytree(f"{OUT}/logs", f"{RUNS}/logs", dirs_exist_ok=True)
@@ -284,8 +298,8 @@ md("""
 
 **Kaggle:** download `eval_mini_out/runs*.zip` from the version's Output tab. **Colab with Drive:** it is in the
 Drive folder. **Colab without Drive:** save the notebook, then locally `python extract_results.py eval_mini.ipynb`.
-The zip (`runs_limit5.zip` for the test run, `runs.zip`
-for the full run): per format a `summary.json`
+The zip is named after your formats (e.g. `runs_Q8_0-Q6_K.zip`); send it to the person combining the results.
+It holds per format a `summary.json`
 (G9's record format) and one `*.samples.jsonl` per task; `scores.csv`, `scores_long.csv`, `paired.md`,
 `environment.json` (GPU, versions, settings, per-format GPU layers and time) and `logs/`. From Drive, or if Drive
 did not mount, download it from the runtime before the session ends.
@@ -300,7 +314,11 @@ def build() -> Path:
               "for _name, _text in SOURCES.items():",
               "    open(f\"{CODE}/{_name}\", \"w\").write(_text)",
               "print(\"wrote\", sorted(SOURCES), \"to\", CODE)"]
+    import hashlib
+    version = hashlib.sha256(("".join(src[k] for k in sorted(src)) + Path(__file__).read_text()).encode()).hexdigest()[:12]
     cells = [code("\n".join(writer)) if c == "__SOURCE_CELL__" else c for c in CELLS]
+    for c in cells:
+        c["source"] = [line.replace("__NOTEBOOK_VERSION__", version) for line in c["source"]]
     nb = {"cells": cells, "nbformat": 4, "nbformat_minor": 5,
           "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
                        "language_info": {"name": "python"}, "accelerator": "GPU",
