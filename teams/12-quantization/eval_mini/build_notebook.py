@@ -126,7 +126,7 @@ print("platform:", PLATFORM, "| output:", OUT, "| model files:", WORK)
 code("""
 # llama-cpp-python with CUDA (compiled here, ~10-25 min). The wheel is kept where it survives a new session
 # (Colab: Drive), so a later session installs it in seconds.
-# GGML_CUDA_NO_VMM: Kaggle's build image has no libcuda for CMake to link (found by Rahul, perplexity/README.md).
+# GGML_CUDA_NO_VMM: Kaggle's build image has no libcuda for CMake to link (found by therahulbhati, perplexity/README.md).
 #
 # The evaluation runs in its OWN venv (EVAL_PY) holding only llama-cpp-python, lm_eval and datasets at G9's pins.
 # lm_eval imports torch and transformers whenever it finds them, and Kaggle's preinstalled ones fail to import
@@ -135,7 +135,7 @@ if LOCAL_TEST:
     LLAMA_SPEC, UV_PYTHON = f"llama-cpp-python=={LLAMA_CPP_PYTHON}", "3.12"   # uv builds it (Metal on a Mac)
 else:
     UV_PYTHON = "python3"   # the platform's python, the one the wheel is built for
-    sh("pip install -q uv", log=f"{OUT}/logs/pip.log")
+    sh("pip install -q uv==0.13.6", log=f"{OUT}/logs/pip.log")
     WHEELS = f"{OUT}/wheels" if OUT == DRIVE_DIR else f"{WORK}/wheels"
     wheels = glob.glob(f"{WHEELS}/llama_cpp_python-{LLAMA_CPP_PYTHON}-*.whl")
     if not wheels:
@@ -196,7 +196,7 @@ if not os.path.exists(BF16):
     # packages this notebook has already imported
     CONV = f"{WORK}/convert-venv"
     if not os.path.exists(f"{CONV}/.ready"):   # uv: Kaggle's python has no ensurepip, so plain venv fails
-        sh(f"rm -rf {CONV} && pip install -q uv && uv venv -q --python python3 {CONV} "
+        sh(f"rm -rf {CONV} && pip install -q uv==0.13.6 && uv venv -q --python python3 {CONV} "
            f"&& uv pip install -q --python {CONV}/bin/python --index-strategy unsafe-best-match "
            f"-r {WORK}/llama.cpp/requirements/requirements-convert_hf_to_gguf.txt {WORK}/llama.cpp/gguf-py "
            f"&& touch {CONV}/.ready", log=f"{OUT}/logs/convert_venv.log")
