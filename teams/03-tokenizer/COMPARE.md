@@ -21,6 +21,7 @@ Tokenizer v0 (`v0/`, #107) only renames reserved special slots, so it encodes pl
 | Sarvam-m | sarvamai/sarvam-m | 1.2672 | 1.9405 | 2.9155 | 3.5911 | 3.7030 | 3.8345 | 4.7443 | 3.1445 | 3.6214 | 3.1976 | 18.1782 | 4.7235 | 4.8722 |
 | Sarvam-1 | sarvamai/sarvam-1 | 1.4313 | 1.4039 | 2.0467 | 2.1554 | 2.1321 | 2.4001 | 2.8345 | 1.7765 | 1.8024 | 1.6826 | 2.3251 | 4.7451 | 2.3004 |
 | c0 (`train/train_bpe.py`) | not published | 1.2596 | 1.6310 | 2.2673 | 2.6597 | 2.5954 | 2.7836 | 3.0869 | 2.1067 | 2.1193 | 2.0053 | 2.6162 | 2.3402 | 2.3829 |
+| c0-v0ids (`--special-layout v0`) | not published | 1.2596 | 1.6311 | 2.2675 | 2.6597 | 2.5955 | 2.7836 | 3.0869 | 2.1067 | 2.1194 | 2.0053 | 2.6162 | 2.3405 | 2.3829 |
 
 ## Code and math (tokens / char, lower is better)
 
@@ -36,6 +37,7 @@ Tokenizer v0 (`v0/`, #107) only renames reserved special slots, so it encodes pl
 | Sarvam-m | 0.3073 | 0.3378 | 0.3508 |
 | Sarvam-1 | 0.3780 | 0.4240 | 0.3805 |
 | c0 (`train/train_bpe.py`) | 0.2979 | 0.3226 | 0.3038 |
+| c0-v0ids (`--special-layout v0`) | 0.2979 | 0.3226 | 0.3038 |
 
 ## Cross-checks against the paper's reference outputs
 
@@ -72,3 +74,59 @@ python harness/run_harness.py --tokenizers BrahmicTokenizer-131K --candidate c0=
 
 The build is deterministic: two runs gave the same sha256. Layout, corpus hashes and verify results are in `train/c0_manifest.json`.
 The tokenizer.json (5,674,537 bytes) is not committed because pr-guard rejects files over 5 MiB (5,242,880 bytes).
+
+## c0-v0ids: c0 with tokenizer v0's special ids
+
+`train_bpe.py --special-layout v0 --v0-tokenizer <v0 tokenizer.json>` keeps all 356 v0 special tokens (#107) at their exact ids and strings. This includes the 9 at scattered ids (36, 128512, 128601, 129279, 129411, 129994, 130173, 130174, 130226) and the g10/lang/ctrl slot blocks.
+
+- Normal tokens fill the other 130,716 ids, so the o200k base has 100 fewer tokens than c0. The pass-bar numbers do not change, and no column moves by more than 0.0003.
+- The build checks the v0 file against `v0/SHA256SUMS`.
+- Its added tokens match v0 entry for entry, and a chat-formatted sample gives the same special-token ids as v0.
+- Three verify scripts PASS. The structural diff against v0 reports `added identical: True`.
+- sha256 `7e9bb94cb43e2395b9b250d1c64500a6f66da020aba136b9147f0590bfd5839d`. The layout is in `train/c0_v0ids_manifest.json`; 4 v0 special ids fall inside the Gurmukhi block.
+
+## v1-c1: Dravidian rebalance with the v1 normalizer (#128)
+
+| Tokenizer | En | Hi | Bn | Ta | Te | Kn | Ml | Mr | Gu | Pa | Or | As | Mean |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| BrahmicTokenizer-131K | 1.2352 | 1.6429 | 2.3295 | 3.1166 | 3.0292 | 3.2734 | 3.4738 | 2.5723 | 2.2748 | 2.5955 | 4.1287 | 2.7535 | 2.8355 |
+| c0 | 1.2596 | 1.6310 | 2.2673 | 2.6597 | 2.5954 | 2.7836 | 3.0869 | 2.1067 | 2.1193 | 2.0053 | 2.6162 | 2.3402 | 2.3829 |
+| **v1-c1** | 1.2596 | 1.6284 | 2.2312 | 2.5932 | 2.5562 | 2.7472 | 3.0331 | 2.1067 | 2.2239 | 2.0137 | 2.4844 | 2.2791 | **2.3543** |
+
+Code is the same as c0: HumanEval 0.2979, MBPP 0.3226, GSM8K 0.3038 tokens / char.
+
+The pass bar against BrahmicTokenizer-131K still holds:
+
+| Metric | v1-c1 vs BrahmicTokenizer-131K |
+|---|---|
+| Mean Indic | **−16.97%** (beats it) |
+| English | +1.98% |
+| HumanEval | +0.95% |
+| MBPP | +0.97% |
+
+Every Indic language is better than BrahmicTokenizer-131K.
+
+- **Build:**
+  - `train_bpe.py --slots train/slots_v1.json --special-layout v0 --normalizer v1`
+  - sha256 `7d2cff92053170fdb17b301448964f1770d88df247b2e794256254227f86af44`
+  - Manifest: `train/v1_c1_manifest.json`. The three gating verify scripts PASS, and the structural diff against v0 reports `added identical: True`.
+- **Changes vs c0:**
+  1. The #134 normalizer (`nfc+chillu+nukta-BnPa`) is applied before counting words and written into tokenizer.json. Measured alone, it lowers the mean from 2.3829 to 2.3646. Pa −3.0%, As −2.6% and Bn −1.6% gain the most, because the merges are now learned on normalized text.
+  2. Ta, Te, Kn and Ml use 60 MB of FineWeb-2 each, up from 20 MB.
+  3. Slots: Ta, Te, Kn and Ml get +512 merges in total, plus Odia +256. Gujarati gives up 512 and Gurmukhi 256. Devanagari and the o200k base are unchanged, so English and code do not move.
+- **vs c0:** Ta −2.5%, Te −1.5%, Kn −1.3%, Ml −1.7%, Or −5.0%. The cost is Gu +4.9% (still −2.2% vs BrahmicTokenizer-131K) and Pa +0.4%.
+- **Training text:** no FLORES sentence (40 or more characters) appears verbatim in the training corpus. All 11 languages were checked. No IN22, HumanEval, MBPP or GSM8K text is used.
+- **Other slot splits tried** (same data and normalizer; FLORES mean Indic):
+
+| Split | Mean Indic | Note |
+|---|---|---|
+| c0 slots | 2.3590 | |
+| v1-c1 | 2.3543 | |
+| Greedy per-merge-gain allocation, Devanagari kept at 3,072 | 2.3488 | Dravidian worse than c0, Gu only −0.3% vs v0 |
+| Unconstrained greedy allocation | 2.3391 | **rejected**: Hindi +6.3% vs BrahmicTokenizer-131K |
+
+  These five splits were chosen on FLORES, so the gaps between them are small and somewhat tuned to it. The real limit is the fixed 16,384 merge budget: freeing base slots (o200k pruning by usage) is the next lever.
+- **Reproduce:**
+  1. `fetch_corpus.py --mb 20` (all languages), then `fetch_corpus.py --mb 60 --langs Ta,Te,Kn,Ml` into the same directory.
+  2. Run the build above. Corpus hashes are in the manifest.
+
