@@ -18,7 +18,7 @@ Full logs (~1.9 MB) were cut to this summary for the PR; the originals are in th
 
 ### bf16
 - GGUF 13,844,565,376 bytes; GPU layers -1 (-1 = all); eval wall clock 2695 s
-- logprob test (test_llamacpp_lm_bf16.log, kept): no log
+- logprob test (test_llamacpp_lm_bf16.log): PASS, run afterwards on 29 Oct, not on Kaggle (this run predates the notebook's test step): Apple M5 16 GB, CPU only (n_gpu_layers=0), llama-cpp-python 0.3.36, on a local bf16 GGUF of the same revision (converted 25 Oct; 576 bytes larger than the Kaggle file, so not byte-identical), 44 s. With all layers on Metal the 13.8 GB file does not fit the 16 GB machine: the logits came back flat (every token -10.83 = -ln 50304) with no error, and the test failed, as it should
 - bf16/arc_challenge: acc_norm=0.4680 +/- 0.0223 n=500 in 518s (1.04s/item), 500 per-item rows
 - bf16/hellaswag: acc_norm=0.6600 +/- 0.0237 n=400 in 634s (1.58s/item), 400 per-item rows
 - bf16/mmlu: acc=0.5368 +/- 0.0202 n=570 in 485s (0.85s/item), 570 per-item rows

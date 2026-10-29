@@ -13,37 +13,48 @@ llama.cpp formats, with **per-item logs**, and compares each format with bf16 **
 | [`combine.py`](combine.py) | merges the zips from several members, checks they used identical code and settings, writes scores + paired comparison |
 | [`extract_results.py`](extract_results.py) | recovers the results zip that the notebook's last cell prints (for a Colab kernel attached from VS Code) |
 
-## Team run: split the formats, combine the results
+## Results
 
-bf16 is done (Kaggle 2×T4, 28 Oct; ARC-C 46.8, HellaSwag 66.0, MMLU 53.7, GSM8K 10.5, TruthfulQA-mc2 37.3). The six
-quantized formats are split between members, two each (~2 h per member on Kaggle, compile included):
-
-| Formats | Run by (GitHub handle) | Status |
-|---|---|---|
-| `Q8_0`, `Q6_K` | | |
-| `Q5_K_M`, `Q4_K_M` | | |
-| `Q3_K_M`, `Q2_K` | s9k96 | done 29 Oct |
-
-**For each member:** import `eval_mini.ipynb` into Kaggle (Accelerator **GPU T4 x2**, Internet **on**), set
-`FORMATS` and `RUN_BY` in the settings cell and nothing else, then **Save Version → Save & Run All (Commit)**.
-Every format is checked by `test_llamacpp_lm.py` before it is scored; a failure stops the run.
-
-**Committing your results:** download `eval_mini_out/runs_<formats>.zip` from the version's Output tab, unzip it to
-`results/raw/runs_<formats>/` (the folder holds your format folders, `environment.json` and `logs/`), and open a PR
-that adds only that folder (branch from `G12-Week1`, or from `shubham_eval_mini` until it is merged). Do not edit
-other runs' folders. Each file stays well under pr-guard's 5 MB limit (a run of two formats is about 4 MB).
+**All seven formats are done.** See [`results/RESULTS.md`](results/RESULTS.md): the scores table, each format against
+bf16 on the same questions (paired difference, 95% CI, McNemar p), and what it means. In short: Q8_0 to Q4_K_M are
+indistinguishable from bf16; Q3_K_M loses 4.2 points on MMLU (p 0.004); Q2_K drops 4.5 to 10.4 points on
+ARC-C, HellaSwag and MMLU.
 
 | Run folder | Formats | Run by | Machine | Date |
 |---|---|---|---|---|
 | `results/raw/runs_bf16/` | bf16 | s9k96 | Kaggle 2×T4 | 28 Oct |
+| `results/raw/runs_Q8_0-Q6_K/` | Q8_0, Q6_K | SreekanthZipsy | Kaggle 2×T4 | 29 Oct |
+| `results/raw/runs_Q5_K_M-Q4_K_M/` | Q5_K_M, Q4_K_M | therahulbhati | Kaggle 2×T4 | 29 Oct |
 | `results/raw/runs_Q3_K_M-Q2_K/` | Q3_K_M, Q2_K | s9k96 | Kaggle 2×T4 | 29 Oct |
 
-**Combining:** `python combine.py results/raw/* --out results/combined` (zips work too). It accepts a run only if
-the model revision, profile, seed, n_ctx, lm_eval and llama-cpp-python versions, G9's runner and the full item counts
-match the bf16 run, and all runs carry the same notebook fingerprint (`NOTEBOOK_VERSION`); test runs (`LIMIT` set)
-are refused. Hardware may differ and is recorded per format in `provenance.json`.
+**How the team ran it.** Each member imported `eval_mini.ipynb` into Kaggle (Accelerator **GPU T4 x2**, Internet
+**on**), set only `FORMATS` and `RUN_BY` in the settings cell, and used **Save Version → Save & Run All (Commit)**
+(~2 h for two formats, compile included). Each format is checked by `test_llamacpp_lm.py` before it is scored; a
+failure stops the run. The results zip from the version's Output tab was unzipped to `results/raw/runs_<formats>/`.
 
-Do not edit the notebook between members' runs: any change to the embedded code changes the fingerprint.
+**Combining:** `python combine.py results/raw/* --out <dir>` (zips work too). It accepts a run only if the model
+revision, profile, seed, n_ctx, lm_eval and llama-cpp-python versions, G9's runner and the full item counts match the
+bf16 run, and all fingerprinted runs carry the same notebook fingerprint (`NOTEBOOK_VERSION`). Test runs (`LIMIT`
+set) are refused. Hardware may differ and is recorded per format in `provenance.json`.
+
+**Notebook version.** The six quantized runs used fingerprint `70829160c1bd`; bf16 predates the fingerprint and was
+checked on its settings. The committed notebook has changed since, without touching scoring:
+- installs pinned (`uv==0.13.6`);
+- check (2) of `test_llamacpp_lm.py` now computes the off-by-one value from the logit rows (always finite) instead of
+  generation's top 50;
+- a comment.
+
+A new run made with today's notebook gets a new fingerprint, so `combine.py` will not mix it with these runs: rerun
+every format with one version.
+
+**What is committed per run** (kept small for the PR):
+- `environment.json`, `scores.csv`, `scores_long.csv`, and per format `summary.json` (G9's record format) plus
+  `*.samples.jsonl`: one row per question with task, doc_id, filter and metric values. The `target` and `response`
+  text were dropped.
+- `logs/SUMMARY.md`, cut from the full logs, and `logs/test_llamacpp_lm_<format>.log`.
+
+The full logs and the full per-question rows are in SreekanthZipsy/era-v5-lab, branch `G12-Week1`, commit
+`2e668bd`.
 
 ## Why not llama-server (or lm_eval's own GGUF backend)
 
@@ -76,7 +87,12 @@ log p(" Paris" | …) = −0.49, the same as greedy generation reports.
 - The converter's separate environment builds from llama.cpp's requirements file (32 s) with the versions that
   made the team's bf16 file.
 
-Not yet checked: the GPU-only steps (CUDA build of llama-cpp-python, bf16 on the T4s) and timings.
+The GPU steps were checked by the team runs themselves: the CUDA build, every layer on the GPU (bf16 split
+across the two T4s), and timings in each run's `environment.json`.
+
+- **bf16 logprob test, run locally on 29 Oct:** an Apple M5 16 GB, CPU only (`n_gpu_layers=0`), took 44 s and passed.
+  With every layer on Metal, the 13.8 GB file did not fit: the logits came back flat with no error, and the test
+  failed. That failure is the test's job: it catches silent garbage as well as the off-by-one bug.
 
 ## Run
 

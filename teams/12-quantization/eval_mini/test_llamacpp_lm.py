@@ -16,8 +16,10 @@ they hold for any GGUF, not only one model's numbers:
 """
 from __future__ import annotations
 
-import math, os, sys
+import os, sys
 from pathlib import Path
+
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from llamacpp_lm import LlamaCppLM  # noqa: E402
@@ -47,10 +49,11 @@ def check(gguf: str) -> list[str]:
     if abs(lp - lp_gen) > TOL:
         failures.append(f"1. score {lp:.3f} != generation's {lp_gen:.3f} for {ANSWER!r}")
 
-    # the off-by-one value: what the distribution one position later gives the same token
-    lm.llm.reset()
-    shifted = lm.llm.create_completion(prompt=CONTEXT + ANSWER, max_tokens=1, temperature=0.0, top_k=1, logprobs=50)
-    after = shifted["choices"][0]["logprobs"]["top_logprobs"][0].get(ANSWER, -math.inf)
+    # the off-by-one value: the answer tokens read from the rows one position later (row i, not i-1), the
+    # server's bug; computed from the logit rows the scoring call above left behind, so it is always finite
+    ctx, cont = lm._encode_pair(CONTEXT, ANSWER)
+    rows = np.asarray(lm.llm.scores[len(ctx): len(ctx) + len(cont)], dtype=np.float64)
+    after = float((rows - np.logaddexp.reduce(rows, axis=1, keepdims=True))[np.arange(len(cont)), cont].sum())
     if abs(lp - after) <= TOL and abs(lp_gen - after) > TOL:
         failures.append(f"2. score {lp:.3f} equals the off-by-one value {after:.3f}")
 

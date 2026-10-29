@@ -17,7 +17,7 @@ MMLU's 57 subjects are pooled into one row.
 """
 from __future__ import annotations
 
-import argparse, gzip, json, math
+import argparse, json, math
 from collections import defaultdict
 from pathlib import Path
 
@@ -33,8 +33,8 @@ def group(task: str) -> str:
 def load(fmt_dir: Path) -> dict[str, dict[tuple, float]]:
     """{group task: {(leaf task, doc_id): primary metric value}}"""
     out = defaultdict(dict)
-    for f in sorted([*fmt_dir.glob("*.samples.jsonl"), *fmt_dir.glob("*.samples.jsonl.gz")]):   # committed runs are gzipped
-        for line in (gzip.open(f, "rt") if f.suffix == ".gz" else open(f)):
+    for f in sorted(fmt_dir.glob("*.samples.jsonl")):
+        for line in open(f):
             r = json.loads(line)
             g = group(r["task"])
             if g not in PRIMARY:

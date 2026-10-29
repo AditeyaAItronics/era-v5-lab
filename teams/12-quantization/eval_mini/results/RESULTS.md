@@ -75,7 +75,7 @@ HellaSwag and MMLU for Q8_0 to Q5_K_M (about 3 points on GSM8K, which has only 2
 | `combined/paired.md` | the paired table with b / c counts |
 | `combined/provenance.json` | who ran each format, hardware, scoring time |
 | `raw/runs_<formats>/<format>/summary.json` | G9's record format, all metrics |
-| `raw/runs_<formats>/<format>/*.samples.jsonl.gz` | one row per question (gzipped; `paired.py` reads them directly) |
+| `raw/runs_<formats>/<format>/*.samples.jsonl` | one row per question: task, doc_id, filter, metric values (what `paired.py` reads) |
 | `raw/runs_<formats>/environment.json` | settings, versions, GPU, timings |
 | `raw/runs_<formats>/logs/SUMMARY.md` | the run's logs cut to what matters: build, quantize sizes and times, per-task results, errors |
 | `raw/runs_<formats>/logs/test_llamacpp_lm_<format>.log` | the logprob test output |
@@ -87,8 +87,12 @@ HellaSwag and MMLU for Q8_0 to Q5_K_M (about 3 points on GSM8K, which has only 2
 | `runs_Q5_K_M-Q4_K_M` | Q5_K_M, Q4_K_M | therahulbhati | 29 Oct |
 | `runs_Q3_K_M-Q2_K` | Q3_K_M, Q2_K | s9k96 | 29 Oct |
 
-The full Kaggle logs (about 2 MB per run, mostly compiler output) were replaced by `logs/SUMMARY.md` to keep the PR
-small. They remain in the history of SreekanthZipsy/era-v5-lab, branch `G12-Week1`, commit `2e668bd`.
+To keep the PR small, two things were cut:
+- the full Kaggle logs (about 2 MB per run, mostly compiler output), replaced by `logs/SUMMARY.md`;
+- the `target` and `response` text of each per-question row (3.9 MB down to 1.2 MB; scores and the paired tables are
+  unchanged).
+
+Both remain in the history of SreekanthZipsy/era-v5-lab, branch `G12-Week1`, commit `2e668bd`.
 
 **Rebuild the tables:** `python combine.py results/raw/* --out <dir>` from `eval_mini/`. It writes the same
 `scores.md` and `paired.md` as `combined/`, plus a copy of every format folder.
