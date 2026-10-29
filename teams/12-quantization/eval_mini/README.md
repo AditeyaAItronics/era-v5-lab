@@ -22,7 +22,7 @@ quantized formats are split between members, two each (~2 h per member on Kaggle
 |---|---|---|
 | `Q8_0`, `Q6_K` | | |
 | `Q5_K_M`, `Q4_K_M` | | |
-| `Q3_K_M`, `Q2_K` | | |
+| `Q3_K_M`, `Q2_K` | s9k96 | done 29 Oct |
 
 **For each member:** import `eval_mini.ipynb` into Kaggle (Accelerator **GPU T4 x2**, Internet **on**), set
 `FORMATS` and `RUN_BY` in the settings cell and nothing else, then **Save Version → Save & Run All (Commit)**.
@@ -36,6 +36,7 @@ other runs' folders. Each file stays well under pr-guard's 5 MB limit (a run of 
 | Run folder | Formats | Run by | Machine | Date |
 |---|---|---|---|---|
 | `results/raw/runs_bf16/` | bf16 | s9k96 | Kaggle 2×T4 | 28 Oct |
+| `results/raw/runs_Q3_K_M-Q2_K/` | Q3_K_M, Q2_K | s9k96 | Kaggle 2×T4 | 29 Oct |
 
 **Combining:** `python combine.py results/raw/* --out results/combined` (zips work too). It accepts a run only if
 the model revision, profile, seed, n_ctx, lm_eval and llama-cpp-python versions, G9's runner and the full item counts
