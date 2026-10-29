@@ -26,10 +26,18 @@ quantized formats are split between members, two each (~2 h per member on Kaggle
 
 **For each member:** import `eval_mini.ipynb` into Kaggle (Accelerator **GPU T4 x2**, Internet **on**), set
 `FORMATS` and `RUN_BY` in the settings cell and nothing else, then **Save Version → Save & Run All (Commit)**.
-Download `eval_mini_out/runs_<formats>.zip` from the version's Output tab and send it to the person combining.
 Every format is checked by `test_llamacpp_lm.py` before it is scored; a failure stops the run.
 
-**Combining:** `python combine.py runs_bf16.zip runs_Q8_0-Q6_K.zip ... --out results/`. It accepts a run only if
+**Committing your results:** download `eval_mini_out/runs_<formats>.zip` from the version's Output tab, unzip it to
+`results/raw/runs_<formats>/` (the folder holds your format folders, `environment.json` and `logs/`), and open a PR
+that adds only that folder (branch from `G12-Week1`, or from `shubham_eval_mini` until it is merged). Do not edit
+other runs' folders. Each file stays well under pr-guard's 5 MB limit (a run of two formats is about 4 MB).
+
+| Run folder | Formats | Run by | Machine | Date |
+|---|---|---|---|---|
+| `results/raw/runs_bf16/` | bf16 | s9k96 | Kaggle 2×T4 | 28 Oct |
+
+**Combining:** `python combine.py results/raw/* --out results/combined` (zips work too). It accepts a run only if
 the model revision, profile, seed, n_ctx, lm_eval and llama-cpp-python versions, G9's runner and the full item counts
 match the bf16 run, and all runs carry the same notebook fingerprint (`NOTEBOOK_VERSION`); test runs (`LIMIT` set)
 are refused. Hardware may differ and is recorded per format in `provenance.json`.
