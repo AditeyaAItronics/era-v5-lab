@@ -99,6 +99,39 @@ The tokenizer.json (5,674,537 bytes) is not committed because pr-guard rejects f
 - Three verify scripts PASS. The structural diff against v0 reports `added identical: True`.
 - sha256 `7e9bb94cb43e2395b9b250d1c64500a6f66da020aba136b9147f0590bfd5839d`. The layout is in `train/c0_v0ids_manifest.json`; 4 v0 special ids fall inside the Gurmukhi block.
 
+## v0 weak-spot check: per-language results (FLORES-200)
+
+Fertility = tokens per word on FLORES-200 dev+devtest (2,009 sentences per language), lower is better. v0 encodes text exactly like BrahmicTokenizer-131K (it only renames reserved slots, see `v0/special_slots.md`), so the v0 column is the BrahmicTokenizer-131K row above. The IndicBERTv2-SS values come from `evaluate_fertility_flores.py --tokenizers all --languages all` in the BrahmicTokenizer-131K repo; it is not in the harness registry.
+
+- **vs Sarvam-m (Tekken)**, the same 131K vocab class: v0 is better on **all 12 languages**.
+- **vs Indic-specialised tokenizers** (best of Sarvam-30B, Sarvam-1, IndicBERTv2-SS): v0 is behind on 10 of 11 Indic languages, level on English and ahead on Assamese.
+- **v0 + normalizer** (#134, no id changes): small gains on clean text, mean −0.13%.
+- **v1-c1** (section below) is shown for progress: it is better than v0 on all 11 Indic languages (mean −17.0%), but still behind the best specialist on most of them.
+
+| Lang | v0 | v0 + normalizer | v1-c1 | Sarvam-m (Tekken) | v0 vs Sarvam-m | Best Indic specialist | v0 gap to specialist |
+|---|---|---|---|---|---|---|---|
+| En | 1.2352 | 1.2352 | 1.2596 | 1.2672 | −2.5% | 1.2368 (Sarvam-30B) | −0.1% |
+| Hi | 1.6429 | 1.6418 | 1.6284 | 1.9405 | −15.3% | 1.2460 (IndicBERTv2-SS) | +31.9% |
+| Bn | 2.3295 | 2.3061 | 2.2312 | 2.9155 | −20.1% | 1.6765 (Sarvam-30B) | +39.0% |
+| Ta | 3.1166 | 3.1165 | 2.5932 | 3.5911 | −13.2% | 2.1554 (Sarvam-1) | +44.6% |
+| Te | 3.0292 | 3.0288 | 2.5562 | 3.7030 | −18.2% | 2.1321 (Sarvam-1) | +42.1% |
+| Kn | 3.2734 | 3.2724 | 2.7472 | 3.8345 | −14.6% | 2.4001 (Sarvam-1) | +36.4% |
+| Ml | 3.4738 | 3.4672 | 3.0331 | 4.7443 | −26.8% | 2.8345 (Sarvam-1) | +22.6% |
+| Mr | 2.5723 | 2.5723 | 2.1067 | 3.1445 | −18.2% | 1.4678 (IndicBERTv2-SS) | +75.2% |
+| Gu | 2.2748 | 2.2748 | 2.2239 | 3.6214 | −37.2% | 1.8024 (Sarvam-1) | +26.2% |
+| Pa | 2.5955 | 2.5926 | 2.0137 | 3.1976 | −18.8% | 1.6313 (Sarvam-30B) | +59.1% |
+| Or | 4.1287 | 4.1245 | 2.4844 | 18.1782 | −77.3% | 1.9659 (Sarvam-30B) | +110.0% |
+| As | 2.7535 | 2.7512 | 2.2791 | 4.7235 | −41.7% | 2.8159 (Sarvam-30B) | −2.2% |
+| **Mean Brahmic (11)** | **2.8355** | **2.8317** | **2.3543** | **4.8722** | **−41.8%** | 2.1444 (Sarvam-30B) | +32.2% |
+
+**Largest v0 gaps to a specialist:** Odia (+110%), Marathi (+75%), Punjabi (+59%), Tamil (+45%), Telugu (+42%), Bengali (+39%), Kannada (+36%). These are the targets for the v1 ideas: Odia/Punjabi leading-space tokens (idea 1), the normalizer (idea 2, #134) and more Dravidian training text (idea 3, v1-c1).
+
+Notes:
+
+- The specialists reach these numbers at a cost elsewhere. Sarvam-30B and Sarvam-1 are more than 13% worse on code (code table above), and IndicBERTv2-SS is strong only on Devanagari (Hi, Mr) and 2–3× worse on other scripts. None of them meets our pass bar.
+- Gemma-4 (not counted as a specialist) also beats v0 on mean Indic (2.7015 vs 2.8355), but it is 13–21% worse on code, so it does not meet the bar either.
+- Mean row: "v0 vs Sarvam-m" compares the two means; "gap to specialist" compares v0's mean with the best specialist mean (Sarvam-30B).
+
 ## v1-c1: Dravidian rebalance with the v1 normalizer (#128)
 
 | Tokenizer | En | Hi | Bn | Ta | Te | Kn | Ml | Mr | Gu | Pa | Or | As | Mean |
@@ -143,4 +176,3 @@ Every Indic language is better than BrahmicTokenizer-131K.
 - **Reproduce:**
   1. `fetch_corpus.py --mb 20` (all languages), then `fetch_corpus.py --mb 60 --langs Ta,Te,Kn,Ml` into the same directory.
   2. Run the build above. Corpus hashes are in the manifest.
-
