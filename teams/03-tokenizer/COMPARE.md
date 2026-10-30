@@ -50,6 +50,20 @@ Brahmic, Qwen3-8B, Sarvam-30B, Sarvam-1. Also identical to 4 decimals:
 
 Sarvam-30B and Gemma-4 tokenize Hindi, Bengali and code identically but differ on Te/Kn/Ml/Gu/Pa/Or, where Sarvam-30B is much better.
 
+## Sarvam-m vs Tekken: structural identity (#130)
+
+`verify_sarvam_m_structural_identity.py` was run on Sarvam-m against Tekken (`mistralai/Mistral-Nemo-Base-2407`), not just on the baseline against itself. Full commands, pinned revisions, hashes and output: `harness/structural_identity_sarvam_m_vs_tekken.md`.
+
+| Check | Result |
+|---|---|
+| BPE merges (269,443 each) | identical, same rank order |
+| Normal vocab strings | 131,066 of 131,072 identical |
+| Special-token strings | 994 of 1,000 identical; 6 renamed (`[IMG]`, `[IMG_BREAK]`, `[IMG_END]`, `[SYSTEM_PROMPT]`, `[/SYSTEM_PROMPT]`, `[TOOL_CONTENT]` vs `<SPECIAL_14>` to `<SPECIAL_19>`) |
+| Token ids (`harness/structural_identity_ids.py`) | 131,062 same string and same id; ids 10 to 19 differ, so `<pad>`, `[PREFIX]`, `[MIDDLE]`, `[SUFFIX]` moved by 1 to 3 |
+| Encode check, 8 sentences (En, Hi, Bn, Ta, Te, Or, code, mixed) | 8 of 8 identical ids |
+
+So Sarvam-m is Tekken's merge table with different special tokens. The difference is more than a rename, because ids 10 to 19 shifted. This is why Sarvam-m's fertility matches Tekken's in the paper. The Sarvam-m row above stands in for Tekken, and the repo has no separate Tekken row yet.
+
 ## Reading the table
 
 - Two comparators beat BrahmicTokenizer-131K on Indic already: Sarvam-30B (2.14) and Sarvam-1 (2.30). Both are **> 13% worse on code**, so neither passes the bar.
