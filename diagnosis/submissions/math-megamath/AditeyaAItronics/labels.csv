@@ -55,12 +55,10 @@ fb3ab766f472f52d,full,drop,C5,"""Pages that link to ""Continuous functions form 
 1677f7fea73fed20,full,fix,C1,"""- Log in to post comments"" at 4949",,blog essay on a two-factor Brownian motion visualisation; embedded demo missing; comment-login footer
 0aeb948665a59861,full,fix,C1;B2,"""- #1  - 15  - 0"" at 0 | ""[/B]"" at 612",,"Physics Forums homework post on capacitor energy; post-number chrome, stray BBCode [/B]"
 a32dc84001af61eb,full,drop,C5;C1,"""Related questions"" at 74 | ""Write your answer..."" at 44",,"answers.com page, unrelated related answers"
-5d2b38ab1410c78e,full,drop,B5;C2,"""Then the CHSH inequality is: Since the measurem…"" at 1957 | ""Guest wrote:Here are the results of a small sim…"" at 0",,"physics forum thread on CHSH; every formula stripped ('the correct expression of M is actually the following:
-.'), quoted posts repeated many times"
+5d2b38ab1410c78e,full,drop,B5;C2,"""Then the CHSH inequality is: Since the measurem…"" at 1957 | ""Guest wrote:Here are the results of a small sim…"" at 0",,"physics forum thread on CHSH; every formula stripped ('the correct expression of M is actually the following: .'), quoted posts repeated many times"
 d169bcff2804de33,full,drop,C5;C2,"""# Search results"" at 0 | ""A cardioid is a plane curve traced by a point o…"" at 18",,"formula-site search results page: truncated snippets with '... more', repeated"
 20f4b8085436f6d3,full,clean,,,,PROFIBUS PA device-description (GSD) config file; intact but not maths and not prose
-98bda19c75264b46,full,drop,B4;C1,"""## Solution"" at 767 | ""All leaked interview problems are collected fro…"" at 73",,"leaked LeetCode Premium SQL solution: Python bytes repr and literal '
-' escapes throughout, code unreadable; not maths"
+98bda19c75264b46,full,drop,B4;C1,"""## Solution"" at 767 | ""All leaked interview problems are collected fro…"" at 73",,"leaked LeetCode Premium SQL solution: Python bytes repr and literal ' ' escapes throughout, code unreadable; not maths"
 7eace66a66292935,full,drop,C5,"""Get Pricecoal hammer mill sizing calculation"" at 711",,"SEO 'Get Price' snippet farm on hammer-mill sizing, ends in keyword dump"
 ae589e91d94f8cff,full,drop,D4;C1,"""Gas push is the an outcome of together momentum…"" at 768 | ""You are watching: Collisions of helium atoms"" at 91",,"word-spun copy of a gas-laws lesson ('pressure' -> 'push', 'is called' -> 'is dubbed'), bold markup split across numbers ('6**.**21x10-21')"
 22b6dd72e7fb8549,full,fix,C1,"""List Price: $110.00"" at 176",,"AMS bookstore page for a monograph on PROPs: good description, price blocks, table of contents with page numbers glued"
